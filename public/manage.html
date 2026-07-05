@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出欠管理 | デジタル招待状メーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="invite.css">
+<link rel="stylesheet" href="create.css">
+<link rel="stylesheet" href="manage.css">
+</head>
+<body class="theme-standard">
+
+<div class="page page--wide">
+
+    <div id="state-loading">
+        <p class="label">確認しています…</p>
+    </div>
+
+    <div id="state-error" hidden>
+        <p class="eyebrow">ERROR</p>
+        <h1 id="errorTitle">アクセスできません</h1>
+        <p class="sub" id="errorSub">URLが正しいかご確認ください。</p>
+    </div>
+
+    <div id="state-manage" hidden>
+        <p class="eyebrow">MANAGEMENT</p>
+        <h1 id="inviteTitle"></h1>
+        <p class="sub">このページは招待相手には送らないでください。</p>
+
+        <!-- 出欠フォーム用 -->
+        <div id="rsvpView" hidden>
+            <div class="rsvp-summary">
+                <div class="rsvp-summary__item rsvp-summary__item--yes">
+                    <span class="rsvp-summary__count" id="countYes">0</span>
+                    <span class="rsvp-summary__label">出席</span>
+                </div>
+                <div class="rsvp-summary__item rsvp-summary__item--no">
+                    <span class="rsvp-summary__count" id="countNo">0</span>
+                    <span class="rsvp-summary__label">欠席</span>
+                </div>
+            </div>
+
+            <div class="rsvp-export">
+                <button type="button" class="btn-secondary" id="copyExcelBtn">Excel用に一覧をコピー</button>
+                <p class="rsvp-export__note">ボタンを押すとクリップボードにコピーされます。Excelのセルに貼り付けると、そのまま列（お名前・役職学年・年齢・出欠・コメント・回答日時）に分かれます。</p>
+                <p class="copied-note" id="copiedExcelNote" hidden>コピーしました</p>
+            </div>
+
+            <div class="rsvp-reply-list" id="replyList"></div>
+            <p class="sub" id="emptyNote" hidden>まだ回答はありません。</p>
+        </div>
+
+        <!-- 日程調整フォーム用 -->
+        <div id="scheduleView" hidden>
+            <div class="schedule-tally" id="scheduleTally"></div>
+
+            <div class="rsvp-export">
+                <button type="button" class="btn-secondary" id="copyScheduleExcelBtn">Excel用に一覧をコピー</button>
+                <p class="rsvp-export__note">ボタンを押すとクリップボードにコピーされます。Excelのセルに貼り付けると、そのまま列（お名前・役職学年・年齢・参加できる候補日・コメント・回答日時）に分かれます。</p>
+                <p class="copied-note" id="copiedScheduleExcelNote" hidden>コピーしました</p>
+            </div>
+
+            <div class="rsvp-reply-list" id="scheduleVoteList"></div>
+            <p class="sub" id="scheduleEmptyNote" hidden>まだ回答はありません。</p>
+        </div>
+    </div>
+
+</div>
+
+<script src="templates.js"></script>
+<script src="manage.js"></script>
+</body>
+</html>

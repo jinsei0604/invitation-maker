@@ -1,4 +1,5 @@
 const steps = {
+    template: document.getElementById("step-template"),
     form: document.getElementById("step-form"),
     preview: document.getElementById("step-preview"),
     processing: document.getElementById("step-processing"),
@@ -17,6 +18,47 @@ function showFatalError(title, sub) {
     showStep("error");
 }
 
+// --- テンプレート選択 ---
+
+const templateGrid = document.getElementById("templateGrid");
+let selectedTemplateId = "standard";
+
+function renderTemplateCards() {
+    TEMPLATES.forEach((template) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "template-card";
+        card.dataset.templateId = template.id;
+        if (template.id === selectedTemplateId) card.classList.add("is-selected");
+
+        card.innerHTML = `
+            <span class="template-card__swatch" style="background: ${template.swatch}"></span>
+            <span class="template-card__text">
+                <h2>${template.name}</h2>
+                <p>${template.description}</p>
+            </span>
+        `;
+
+        card.addEventListener("click", () => selectTemplate(template.id));
+        templateGrid.appendChild(card);
+    });
+}
+
+function selectTemplate(templateId) {
+    selectedTemplateId = templateId;
+    templateGrid.querySelectorAll(".template-card").forEach((card) => {
+        card.classList.toggle("is-selected", card.dataset.templateId === templateId);
+    });
+    applyTemplateTheme(templateId);
+}
+
+document.getElementById("templateNextBtn").addEventListener("click", () => {
+    showStep("form");
+});
+
+renderTemplateCards();
+applyTemplateTheme(selectedTemplateId);
+
 // --- フォーム ---
 
 const inviteForm = document.getElementById("inviteForm");
@@ -25,17 +67,59 @@ const datetimeInput = document.getElementById("datetimeInput");
 const locationInput = document.getElementById("locationInput");
 const messageInput = document.getElementById("messageInput");
 const formError = document.getElementById("formError");
-const sealPicker = document.getElementById("sealPicker");
 
-let selectedSealColor = "blue";
-
-sealPicker.addEventListener("click", (e) => {
-    const btn = e.target.closest(".seal-swatch");
-    if (!btn) return;
-    sealPicker.querySelectorAll(".seal-swatch").forEach((el) => el.classList.remove("is-selected"));
-    btn.classList.add("is-selected");
-    selectedSealColor = btn.dataset.color;
+document.getElementById("backToTemplateBtn").addEventListener("click", () => {
+    showStep("template");
 });
+
+// --- 回答方式（出欠 / 日程調整）の選択 ---
+
+const responseTypePicker = document.getElementById("responseTypePicker");
+const scheduleOptionsField = document.getElementById("scheduleOptionsField");
+const scheduleOptionsList = document.getElementById("scheduleOptionsList");
+let selectedResponseType = "rsvp";
+
+function addScheduleOptionRow() {
+    const row = document.createElement("div");
+    row.className = "schedule-option-row";
+    row.innerHTML = `
+        <input type="datetime-local" class="schedule-option-input">
+        <button type="button" class="schedule-option-remove" aria-label="削除">×</button>
+    `;
+    row.querySelector(".schedule-option-remove").addEventListener("click", () => {
+        if (scheduleOptionsList.children.length > 2) {
+            row.remove();
+        }
+    });
+    scheduleOptionsList.appendChild(row);
+}
+
+// 最初から2件、候補日の入力欄を用意しておく
+addScheduleOptionRow();
+addScheduleOptionRow();
+
+document.getElementById("addScheduleOptionBtn").addEventListener("click", () => {
+    addScheduleOptionRow();
+});
+
+responseTypePicker.addEventListener("click", (e) => {
+    const btn = e.target.closest(".response-type-btn");
+    if (!btn) return;
+    selectedResponseType = btn.dataset.responseType;
+    responseTypePicker.querySelectorAll(".response-type-btn").forEach((el) => {
+        el.classList.toggle("is-selected", el === btn);
+    });
+    scheduleOptionsField.hidden = selectedResponseType !== "schedule";
+});
+
+function currentScheduleOptions() {
+    return Array.from(scheduleOptionsList.querySelectorAll(".schedule-option-input"))
+        .map((input) => input.value)
+        .filter(Boolean)
+        .map((value) => new Date(value).toLocaleString("ja-JP", {
+            year: "numeric", month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit",
+        }));
+}
 
 function currentFormData() {
     return {
@@ -43,7 +127,9 @@ function currentFormData() {
         event_datetime: datetimeInput.value ? new Date(datetimeInput.value).toISOString() : "",
         location: locationInput.value.trim(),
         message: messageInput.value.trim(),
-        seal_color: selectedSealColor,
+        template_id: selectedTemplateId,
+        response_type: selectedResponseType,
+        schedule_options: selectedResponseType === "schedule" ? currentScheduleOptions() : [],
     };
 }
 
@@ -62,13 +148,17 @@ inviteForm.addEventListener("submit", (e) => {
         formError.hidden = false;
         return;
     }
+    if (data.response_type === "schedule" && data.schedule_options.length < 2) {
+        formError.textContent = "候補日を2つ以上入力してください";
+        formError.hidden = false;
+        return;
+    }
 
     enterPreview(data);
 });
 
 // --- プレビュー（開封アニメーション） ---
 
-const scene = document.getElementById("scene");
 const previewStates = {
     tap: document.getElementById("state-tap"),
     opening: document.getElementById("state-opening"),
@@ -133,13 +223,17 @@ function fillRevealContent(data) {
 
 function playOpenAnimation() {
     showPreviewState("opening");
+    triggerSceneOpen();
     envelopeScene.classList.remove("is-opening");
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             envelopeScene.classList.add("is-opening");
         });
     });
-    setTimeout(() => showPreviewState("revealed"), ANIMATION_MS);
+    setTimeout(() => {
+        showPreviewState("revealed");
+        playTemplateEffect(selectedTemplateId);
+    }, ANIMATION_MS);
 }
 
 tapSealButton.addEventListener("click", () => {
@@ -150,11 +244,12 @@ tapSealButton.addEventListener("click", () => {
 replayBtn.addEventListener("click", () => {
     tapSealButton.disabled = false;
     envelopeScene.classList.remove("is-opening");
+    document.getElementById("bgScene")?.classList.remove("is-open");
     showPreviewState("tap");
 });
 
 function enterPreview(data) {
-    scene.dataset.seal = data.seal_color;
+    applyTemplateTheme(data.template_id);
     fillRevealContent(data);
     tapSealButton.disabled = false;
     envelopeScene.classList.remove("is-opening");
@@ -171,8 +266,7 @@ document.getElementById("backToFormBtn").addEventListener("click", () => {
 const checkoutError = document.getElementById("checkoutError");
 const goCheckoutBtn = document.getElementById("goCheckoutBtn");
 const shareUrlInput = document.getElementById("shareUrlInput");
-const copyBtn = document.getElementById("copyBtn");
-const copiedNote = document.getElementById("copiedNote");
+const manageUrlInput = document.getElementById("manageUrlInput");
 const viewInviteLink = document.getElementById("viewInviteLink");
 
 async function createInvitation(data) {
@@ -185,7 +279,7 @@ async function createInvitation(data) {
     if (!res.ok) {
         throw new Error(resData.error || "招待状の作成に失敗しました");
     }
-    return resData.shareUrl;
+    return resData;
 }
 
 goCheckoutBtn.addEventListener("click", async () => {
@@ -193,8 +287,9 @@ goCheckoutBtn.addEventListener("click", async () => {
     goCheckoutBtn.disabled = true;
     showStep("processing");
     try {
-        const shareUrl = await createInvitation(currentFormData());
+        const { shareUrl, manageUrl } = await createInvitation(currentFormData());
         shareUrlInput.value = shareUrl;
+        manageUrlInput.value = manageUrl;
         viewInviteLink.href = shareUrl;
         showStep("complete");
     } catch (err) {
@@ -206,15 +301,22 @@ goCheckoutBtn.addEventListener("click", async () => {
     }
 });
 
-copyBtn.addEventListener("click", async () => {
-    try {
-        await navigator.clipboard.writeText(shareUrlInput.value);
-    } catch (err) {
-        shareUrlInput.select();
-        document.execCommand("copy");
-    }
-    copiedNote.hidden = false;
-    setTimeout(() => { copiedNote.hidden = true; }, 2000);
-});
+function setupCopyButton(buttonId, inputEl, noteId) {
+    const button = document.getElementById(buttonId);
+    const note = document.getElementById(noteId);
+    button.addEventListener("click", async () => {
+        try {
+            await navigator.clipboard.writeText(inputEl.value);
+        } catch (err) {
+            inputEl.select();
+            document.execCommand("copy");
+        }
+        note.hidden = false;
+        setTimeout(() => { note.hidden = true; }, 2000);
+    });
+}
 
-showStep("form");
+setupCopyButton("copyShareBtn", shareUrlInput, "copiedShareNote");
+setupCopyButton("copyManageBtn", manageUrlInput, "copiedManageNote");
+
+showStep("template");

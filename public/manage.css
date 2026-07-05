@@ -1,0 +1,197 @@
+.page--wide {
+    max-width: 640px;
+    text-align: left;
+    align-items: stretch;
+}
+
+.page--wide h1 {
+    text-align: left;
+}
+
+#state-loading,
+#state-error {
+    text-align: center;
+}
+
+/* --- 集計 --- */
+
+.rsvp-summary {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0 24px;
+}
+
+.rsvp-summary__item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.rsvp-summary__count {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.rsvp-summary__item--yes .rsvp-summary__count {
+    color: var(--accent);
+}
+
+.rsvp-summary__label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+/* --- Excel用コピー --- */
+
+.rsvp-export {
+    margin-bottom: 20px;
+}
+
+.rsvp-export .btn-secondary {
+    width: auto;
+    padding: 10px 18px;
+}
+
+.rsvp-export__note {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+/* --- 回答一覧 --- */
+
+.rsvp-reply-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rsvp-reply-card {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.rsvp-reply-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.rsvp-reply-card__name {
+    font-weight: 600;
+    font-size: 14.5px;
+    color: var(--text);
+}
+
+.rsvp-reply-card__badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.rsvp-reply-card__badge--yes {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.rsvp-reply-card__badge--no {
+    background: rgba(179, 39, 58, 0.1);
+    color: var(--error);
+}
+
+.rsvp-reply-card__comment {
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 6px 0;
+}
+
+.rsvp-reply-card__date {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.rsvp-reply-card__meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 4px;
+}
+
+/* --- 日程調整の集計 --- */
+
+.schedule-tally {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 20px 0 24px;
+}
+
+.schedule-tally__row {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.schedule-tally__row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.schedule-tally__label {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.schedule-tally__count {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.schedule-tally__bar-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--bg-vignette);
+    overflow: hidden;
+}
+
+.schedule-tally__bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 999px;
+}
+
+.rsvp-reply-card__dates {
+    font-size: 13.5px;
+    color: var(--text);
+    line-height: 1.6;
+    margin: 0 0 6px;
+}

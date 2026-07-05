@@ -10,12 +10,27 @@
 <link rel="stylesheet" href="invite.css">
 <link rel="stylesheet" href="create.css">
 </head>
-<body>
+<body class="theme-standard">
+
+<div class="bg-scene" id="bgScene" aria-hidden="true"></div>
 
 <div class="page">
 
-    <!-- Step 1: 入力フォーム -->
-    <section class="step" id="step-form">
+    <!-- Step 1: テンプレート選択 -->
+    <section class="step" id="step-template">
+        <p class="eyebrow">DIGITAL INVITATION</p>
+        <h1>テンプレートを選ぶ</h1>
+        <p class="sub">封蝋の色・絵柄と、開封後の演出が一緒に切り替わります。</p>
+
+        <div class="template-grid" id="templateGrid"></div>
+
+        <div class="preview-actions">
+            <button type="button" class="btn-primary" id="templateNextBtn">次へ</button>
+        </div>
+    </section>
+
+    <!-- Step 2: 入力フォーム -->
+    <section class="step" id="step-form" hidden>
         <p class="eyebrow">DIGITAL INVITATION</p>
         <h1>招待状をつくる</h1>
         <p class="sub">封蝋を開けるアニメーション付きの招待状を作成できます。</p>
@@ -42,18 +57,23 @@
             </label>
 
             <div class="field">
-                <span class="field__label">封蝋の色</span>
-                <div class="seal-picker" id="sealPicker">
-                    <button type="button" class="seal-swatch seal-swatch--blue is-selected" data-color="blue" aria-label="青"></button>
-                    <button type="button" class="seal-swatch seal-swatch--red" data-color="red" aria-label="赤"></button>
-                    <button type="button" class="seal-swatch seal-swatch--green" data-color="green" aria-label="緑"></button>
-                    <button type="button" class="seal-swatch seal-swatch--gold" data-color="gold" aria-label="金"></button>
+                <span class="field__label">回答方式</span>
+                <div class="response-type-picker" id="responseTypePicker">
+                    <button type="button" class="response-type-btn is-selected" data-response-type="rsvp">出欠を聞く</button>
+                    <button type="button" class="response-type-btn" data-response-type="schedule">日程調整（候補日に投票してもらう）</button>
                 </div>
+            </div>
+
+            <div class="field" id="scheduleOptionsField" hidden>
+                <span class="field__label">候補日 <span class="required">必須・2つ以上</span></span>
+                <div class="schedule-options-list" id="scheduleOptionsList"></div>
+                <button type="button" class="link-btn" id="addScheduleOptionBtn">＋ 候補日を追加</button>
             </div>
 
             <p class="error-text" id="formError" hidden></p>
 
             <button type="submit" class="btn-primary">プレビューする</button>
+            <button type="button" class="link-btn" id="backToTemplateBtn">テンプレートを選び直す</button>
         </form>
     </section>
 
@@ -167,15 +187,28 @@
     <section class="step" id="step-complete" hidden>
         <p class="eyebrow">COMPLETE</p>
         <h1>招待状ができました</h1>
-        <p class="sub">下記のURLを招待したい相手に送ってください。何度開いても内容は消えません。</p>
 
-        <div class="share-box">
-            <input type="text" id="shareUrlInput" readonly>
-            <button type="button" class="btn-primary" id="copyBtn">コピー</button>
+        <div class="url-block url-block--share">
+            <p class="url-block__label">招待相手に送るURL</p>
+            <p class="url-block__desc">このURLを送ってください。何度開いても内容は消えません。</p>
+            <div class="share-box">
+                <input type="text" id="shareUrlInput" readonly>
+                <button type="button" class="btn-primary" id="copyShareBtn">コピー</button>
+            </div>
+            <p class="copied-note" id="copiedShareNote" hidden>コピーしました</p>
+            <a class="link-btn" id="viewInviteLink" href="#" target="_blank" rel="noopener">実際の招待状を見てみる</a>
         </div>
-        <p class="copied-note" id="copiedNote" hidden>コピーしました</p>
 
-        <a class="link-btn" id="viewInviteLink" href="#" target="_blank" rel="noopener">実際の招待状を見てみる</a>
+        <div class="url-block url-block--manage">
+            <p class="url-block__label url-block__label--warning">管理用URL（あなただけが見るものです）</p>
+            <p class="url-block__desc">出欠の回答を確認できます。<strong>招待相手には送らないでください。</strong></p>
+            <div class="share-box">
+                <input type="text" id="manageUrlInput" readonly>
+                <button type="button" class="btn-secondary" id="copyManageBtn">コピー</button>
+            </div>
+            <p class="copied-note" id="copiedManageNote" hidden>コピーしました</p>
+        </div>
+
         <a class="link-btn" href="/create.html">新しい招待状をつくる</a>
     </section>
 
@@ -192,6 +225,7 @@
     </footer>
 </div>
 
+<script src="templates.js"></script>
 <script src="create.js"></script>
 </body>
 </html>

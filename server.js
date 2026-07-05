@@ -17,7 +17,17 @@ try {
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const SEAL_COLORS = ["blue", "red", "green", "gold"];
+const TEMPLATE_IDS = ["standard", "wedding", "matsuri"];
+// LINEやX等でURLをシェアしたときのリンクプレビューに使うサービス名。.envで自由に設定できる
+const SITE_NAME = process.env.SITE_NAME || "デジタル招待状";
+
+function escapeHtmlAttr(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
 
 // --- DB setup ---
 const dataDir = path.join(__dirname, "data");
@@ -36,18 +46,152 @@ db.exec(`
     )
 `);
 
+// 既存のDBファイルに対しては、足りない列を追加する（新規作成時は最初から含まれる）
+const existingColumns = db.prepare(`PRAGMA table_info(invitations)`).all();
+if (!existingColumns.some((col) => col.name === "template_id")) {
+    db.exec(`ALTER TABLE invitations ADD COLUMN template_id TEXT DEFAULT 'standard'`);
+}
+if (!existingColumns.some((col) => col.name === "manage_token")) {
+    db.exec(`ALTER TABLE invitations ADD COLUMN manage_token TEXT`);
+}
+if (!existingColumns.some((col) => col.name === "response_type")) {
+    db.exec(`ALTER TABLE invitations ADD COLUMN response_type TEXT DEFAULT 'rsvp'`);
+}
+
+db.exec(`
+    CREATE TABLE IF NOT EXISTS replies (
+        id TEXT PRIMARY KEY,
+        invitation_id TEXT NOT NULL,
+        guest_name TEXT NOT NULL,
+        attending TEXT NOT NULL,
+        comment TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (invitation_id) REFERENCES invitations(id)
+    )
+`);
+
+const replyColumns = db.prepare(`PRAGMA table_info(replies)`).all();
+if (!replyColumns.some((col) => col.name === "role_grade")) {
+    db.exec(`ALTER TABLE replies ADD COLUMN role_grade TEXT`);
+}
+if (!replyColumns.some((col) => col.name === "age")) {
+    db.exec(`ALTER TABLE replies ADD COLUMN age TEXT`);
+}
+
+db.exec(`
+    CREATE TABLE IF NOT EXISTS schedule_options (
+        id TEXT PRIMARY KEY,
+        invitation_id TEXT NOT NULL,
+        option_label TEXT NOT NULL,
+        sort_order INTEGER DEFAULT 0,
+        FOREIGN KEY (invitation_id) REFERENCES invitations(id)
+    )
+`);
+
+db.exec(`
+    CREATE TABLE IF NOT EXISTS schedule_votes (
+        id TEXT PRIMARY KEY,
+        invitation_id TEXT NOT NULL,
+        guest_name TEXT NOT NULL,
+        role_grade TEXT,
+        age TEXT,
+        selected_option_ids TEXT NOT NULL,
+        comment TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (invitation_id) REFERENCES invitations(id)
+    )
+`);
+
 const statements = {
     insert: db.prepare(`
-        INSERT INTO invitations (id, title, event_datetime, location, message, seal_color)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO invitations (id, title, event_datetime, location, message, template_id, manage_token, response_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `),
     getById: db.prepare(`SELECT * FROM invitations WHERE id = ?`),
+
+    insertScheduleOption: db.prepare(`
+        INSERT INTO schedule_options (id, invitation_id, option_label, sort_order)
+        VALUES (?, ?, ?, ?)
+    `),
+    getScheduleOptions: db.prepare(`
+        SELECT id, option_label FROM schedule_options
+        WHERE invitation_id = ? ORDER BY sort_order ASC
+    `),
+
+    // 出欠フォーム（response_type = 'rsvp'）
+    insertReply: db.prepare(`
+        INSERT INTO replies (id, invitation_id, guest_name, attending, comment, role_grade, age)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `),
+    getReplyByNameAndRole: db.prepare(`
+        SELECT id FROM replies WHERE invitation_id = ? AND guest_name = ? AND IFNULL(role_grade, '') = IFNULL(?, '')
+    `),
+    updateReply: db.prepare(`
+        UPDATE replies SET attending = ?, comment = ?, age = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
+    `),
+    getRepliesByInvitationId: db.prepare(`
+        SELECT guest_name, attending, comment, role_grade, age, created_at FROM replies
+        WHERE invitation_id = ? ORDER BY created_at DESC
+    `),
+
+    // 日程調整フォーム（response_type = 'schedule'）
+    insertScheduleVote: db.prepare(`
+        INSERT INTO schedule_votes (id, invitation_id, guest_name, role_grade, age, selected_option_ids, comment)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `),
+    getScheduleVoteByNameAndRole: db.prepare(`
+        SELECT id FROM schedule_votes WHERE invitation_id = ? AND guest_name = ? AND IFNULL(role_grade, '') = IFNULL(?, '')
+    `),
+    updateScheduleVote: db.prepare(`
+        UPDATE schedule_votes SET selected_option_ids = ?, comment = ?, age = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
+    `),
+    getScheduleVotesByInvitationId: db.prepare(`
+        SELECT guest_name, role_grade, age, selected_option_ids, comment, created_at FROM schedule_votes
+        WHERE invitation_id = ? ORDER BY created_at DESC
+    `),
 };
 
 // --- App setup ---
 const app = express();
 
 app.use(express.json());
+
+// LINEやX、Slack等でURLを貼ったときに、招待状ごとのタイトルでリンクプレビューが
+// 表示されるよう、invite.htmlの<head>にOGPタグを差し込んでから返す。
+// リンクプレビューを取得するクローラーはJavaScriptを実行しないため、
+// クライアント側の描画ではなくサーバー側でHTMLに埋め込む必要がある。
+app.get("/invite.html", (req, res, next) => {
+    const invitationId = req.query.id;
+    if (!invitationId) return next();
+
+    const invitation = statements.getById.get(invitationId);
+    if (!invitation) return next();
+
+    fs.readFile(path.join(__dirname, "public", "invite.html"), "utf8", (err, html) => {
+        if (err) return next(err);
+
+        const pageUrl = `${BASE_URL}/invite.html?id=${invitationId}`;
+        const ogTitle = escapeHtmlAttr(`${invitation.title} | ${SITE_NAME}`);
+        const ogDescription = escapeHtmlAttr(`${invitation.title} の招待状が届いています。タップして開いてください。`);
+        const ogUrl = escapeHtmlAttr(pageUrl);
+        const ogSiteName = escapeHtmlAttr(SITE_NAME);
+
+        const metaTags = `
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="${ogTitle}">
+    <meta property="og:description" content="${ogDescription}">
+    <meta property="og:url" content="${ogUrl}">
+    <meta property="og:site_name" content="${ogSiteName}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="${ogTitle}">
+    <meta name="twitter:description" content="${ogDescription}">
+`;
+
+        res.set("Content-Type", "text/html; charset=utf-8");
+        res.send(html.replace("<!-- OGP_META -->", metaTags));
+    });
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
 app.get("/", (req, res) => {
@@ -56,7 +200,7 @@ app.get("/", (req, res) => {
 
 // フォーム内容を保存し、招待状の共有URLを発行する（完全無料なので決済は挟まない）
 app.post("/invitations", (req, res) => {
-    const { title, event_datetime, location, message, seal_color } = req.body || {};
+    const { title, event_datetime, location, message, template_id, response_type, schedule_options } = req.body || {};
 
     if (!title || !String(title).trim()) {
         return res.status(400).json({ error: "タイトルを入力してください" });
@@ -65,8 +209,21 @@ app.post("/invitations", (req, res) => {
         return res.status(400).json({ error: "メッセージ本文を入力してください" });
     }
 
-    const sealColor = SEAL_COLORS.includes(seal_color) ? seal_color : "blue";
+    const responseType = response_type === "schedule" ? "schedule" : "rsvp";
+    let cleanedOptions = [];
+    if (responseType === "schedule") {
+        cleanedOptions = Array.isArray(schedule_options)
+            ? schedule_options.map((label) => String(label).trim()).filter(Boolean)
+            : [];
+        if (cleanedOptions.length < 2) {
+            return res.status(400).json({ error: "候補日を2つ以上入力してください" });
+        }
+    }
+
+    const templateId = TEMPLATE_IDS.includes(template_id) ? template_id : "standard";
     const id = crypto.randomUUID();
+    // IDとは別の値にすることで、招待状のURLを知っているだけでは管理ページに入れないようにする
+    const manageToken = crypto.randomBytes(12).toString("hex");
 
     statements.insert.run(
         id,
@@ -74,10 +231,20 @@ app.post("/invitations", (req, res) => {
         event_datetime ? String(event_datetime) : null,
         location ? String(location).trim() : null,
         String(message).trim(),
-        sealColor,
+        templateId,
+        manageToken,
+        responseType,
     );
 
-    res.json({ id, shareUrl: `${BASE_URL}/invite.html?id=${id}` });
+    cleanedOptions.forEach((label, index) => {
+        statements.insertScheduleOption.run(crypto.randomUUID(), id, label, index);
+    });
+
+    res.json({
+        id,
+        shareUrl: `${BASE_URL}/invite.html?id=${id}`,
+        manageUrl: `${BASE_URL}/manage.html?id=${id}&token=${manageToken}`,
+    });
 });
 
 // 招待状閲覧ページ用。閲覧回数の制限はない。
@@ -87,12 +254,163 @@ app.get("/invitations/:id", (req, res) => {
         return res.status(404).json({ error: "この招待状は見つかりません" });
     }
 
+    const responseType = invitation.response_type || "rsvp";
+
     res.json({
         title: invitation.title,
         event_datetime: invitation.event_datetime,
         location: invitation.location,
         message: invitation.message,
-        seal_color: invitation.seal_color,
+        template_id: invitation.template_id || "standard",
+        response_type: responseType,
+        schedule_options: responseType === "schedule" ? statements.getScheduleOptions.all(invitation.id) : [],
+    });
+});
+
+// 出欠の返信を保存する。招待状のページ内で完結させ、別ページには遷移させない
+app.post("/invitations/:id/replies", (req, res) => {
+    const invitation = statements.getById.get(req.params.id);
+    if (!invitation) {
+        return res.status(404).json({ error: "この招待状は見つかりません" });
+    }
+
+    const { guest_name, attending, comment, role_grade, age } = req.body || {};
+
+    if (!guest_name || !String(guest_name).trim()) {
+        return res.status(400).json({ error: "お名前を入力してください" });
+    }
+    if (attending !== "yes" && attending !== "no") {
+        return res.status(400).json({ error: "出欠を選択してください" });
+    }
+
+    const trimmedName = String(guest_name).trim();
+    const trimmedComment = comment ? String(comment).trim() : null;
+    const trimmedRole = role_grade ? String(role_grade).trim() : null;
+    const trimmedAge = age ? String(age).trim() : null;
+
+    // 同じ招待状に「同じ名前＋同じ役職・学年」の回答が既にある場合は、新規追加ではなく上書きする
+    // （出席→欠席に変更したい場合などに重複行を作らないため。role_gradeも一致条件に含めることで、
+    //   同姓同名の別人がいてもrole_gradeが異なれば別回答として扱える）
+    const existingReply = statements.getReplyByNameAndRole.get(invitation.id, trimmedName, trimmedRole);
+    if (existingReply) {
+        statements.updateReply.run(attending, trimmedComment, trimmedAge, existingReply.id);
+    } else {
+        statements.insertReply.run(
+            crypto.randomUUID(),
+            invitation.id,
+            trimmedName,
+            attending,
+            trimmedComment,
+            trimmedRole,
+            trimmedAge,
+        );
+    }
+
+    res.json({ ok: true });
+});
+
+// 日程調整の投票を保存する（response_type = 'schedule' の招待状用）
+app.post("/invitations/:id/schedule-votes", (req, res) => {
+    const invitation = statements.getById.get(req.params.id);
+    if (!invitation) {
+        return res.status(404).json({ error: "この招待状は見つかりません" });
+    }
+
+    const { guest_name, selected_option_ids, comment, role_grade, age } = req.body || {};
+
+    if (!guest_name || !String(guest_name).trim()) {
+        return res.status(400).json({ error: "お名前を入力してください" });
+    }
+    if (!Array.isArray(selected_option_ids) || selected_option_ids.length === 0) {
+        return res.status(400).json({ error: "候補日を1つ以上選択してください" });
+    }
+
+    const validOptionIds = new Set(statements.getScheduleOptions.all(invitation.id).map((o) => o.id));
+    const cleanedSelection = selected_option_ids.filter((optionId) => validOptionIds.has(optionId));
+    if (cleanedSelection.length === 0) {
+        return res.status(400).json({ error: "候補日を1つ以上選択してください" });
+    }
+
+    const trimmedName = String(guest_name).trim();
+    const trimmedComment = comment ? String(comment).trim() : null;
+    const trimmedRole = role_grade ? String(role_grade).trim() : null;
+    const trimmedAge = age ? String(age).trim() : null;
+    const selectionJson = JSON.stringify(cleanedSelection);
+
+    const existingVote = statements.getScheduleVoteByNameAndRole.get(invitation.id, trimmedName, trimmedRole);
+    if (existingVote) {
+        statements.updateScheduleVote.run(selectionJson, trimmedComment, trimmedAge, existingVote.id);
+    } else {
+        statements.insertScheduleVote.run(
+            crypto.randomUUID(),
+            invitation.id,
+            trimmedName,
+            trimmedRole,
+            trimmedAge,
+            selectionJson,
+            trimmedComment,
+        );
+    }
+
+    res.json({ ok: true });
+});
+
+// 出欠の集計・一覧。manage_token が一致した場合のみ返す（招待状の作成者専用）
+app.get("/invitations/:id/replies", (req, res) => {
+    const invitation = statements.getById.get(req.params.id);
+    if (!invitation) {
+        return res.status(404).json({ error: "この招待状は見つかりません" });
+    }
+    if (!req.query.token || req.query.token !== invitation.manage_token) {
+        return res.status(403).json({ error: "アクセスできません" });
+    }
+
+    const replies = statements.getRepliesByInvitationId.all(invitation.id);
+    const counts = { yes: 0, no: 0 };
+    replies.forEach((reply) => {
+        if (reply.attending === "yes") counts.yes += 1;
+        else if (reply.attending === "no") counts.no += 1;
+    });
+
+    res.json({
+        title: invitation.title,
+        template_id: invitation.template_id || "standard",
+        response_type: invitation.response_type || "rsvp",
+        counts,
+        replies,
+    });
+});
+
+// 日程調整の集計・一覧。manage_token が一致した場合のみ返す（招待状の作成者専用）
+app.get("/invitations/:id/schedule-votes", (req, res) => {
+    const invitation = statements.getById.get(req.params.id);
+    if (!invitation) {
+        return res.status(404).json({ error: "この招待状は見つかりません" });
+    }
+    if (!req.query.token || req.query.token !== invitation.manage_token) {
+        return res.status(403).json({ error: "アクセスできません" });
+    }
+
+    const options = statements.getScheduleOptions.all(invitation.id);
+    const votes = statements.getScheduleVotesByInvitationId.all(invitation.id).map((vote) => ({
+        ...vote,
+        selected_option_ids: JSON.parse(vote.selected_option_ids),
+    }));
+
+    const counts = {};
+    options.forEach((option) => { counts[option.id] = 0; });
+    votes.forEach((vote) => {
+        vote.selected_option_ids.forEach((optionId) => {
+            if (counts[optionId] !== undefined) counts[optionId] += 1;
+        });
+    });
+
+    res.json({
+        title: invitation.title,
+        template_id: invitation.template_id || "standard",
+        options,
+        counts,
+        votes,
     });
 });
 
