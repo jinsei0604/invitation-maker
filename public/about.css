@@ -1,0 +1,36 @@
+.page--wide {
+    max-width: 640px;
+    text-align: left;
+    align-items: stretch;
+}
+
+.page--wide h1 {
+    text-align: left;
+}
+
+.info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0 28px;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.info-table th,
+.info-table td {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.info-table th {
+    width: 30%;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.info-table td {
+    color: var(--text);
+}
