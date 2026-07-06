@@ -11,6 +11,8 @@ body {
 }
 
 .page {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 480px;
 }
@@ -32,35 +34,9 @@ body {
     display: none;
 }
 
-h1 {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 26px;
-    line-height: 1.4;
-    margin: 0 0 10px;
-    color: var(--text);
-}
-
-.sub {
-    font-size: 14px;
-    color: var(--text-muted);
-    margin: 0 0 24px;
-    line-height: 1.7;
-}
-
-.eyebrow {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    letter-spacing: 0.18em;
-    color: var(--text-muted);
-    margin: 0 0 10px;
-}
+/* h1 / .sub / .eyebrow / .label の基本スタイルは invite.css 側で定義済み（--bg-text系を使用） */
 
 .label {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
     margin-top: 20px;
 }
 
@@ -83,7 +59,7 @@ h1 {
 .field__label {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text);
+    color: var(--bg-text);
 }
 
 .required {
@@ -124,36 +100,130 @@ textarea:focus {
     box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* --- 封蝋カラーピッカー --- */
+/* --- 回答方式の選択 --- */
 
-.seal-picker {
+.response-type-picker {
     display: flex;
-    gap: 14px;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.seal-swatch {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 2px solid transparent;
+.response-type-btn {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    text-align: left;
     cursor: pointer;
-    padding: 0;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.response-type-btn:hover {
+    border-color: var(--accent);
+}
+
+.response-type-btn.is-selected {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #f5eee8;
+}
+
+/* --- 候補日の入力 --- */
+
+.schedule-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.schedule-option-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.schedule-option-row input[type="datetime-local"] {
+    flex: 1;
+}
+
+.schedule-option-remove {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.schedule-option-remove:hover {
+    border-color: var(--error);
+    color: var(--error);
+}
+
+/* --- テンプレート選択 --- */
+
+.template-grid {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.template-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.template-card:hover {
+    border-color: var(--accent);
+}
+
+.template-card.is-selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.template-card__swatch {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     box-shadow: inset 0 -4px 8px rgba(0,0,0,0.2), inset 0 3px 6px rgba(255,255,255,0.16);
-    transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
-.seal-swatch:hover {
-    transform: scale(1.08);
+.template-card__text h2 {
+    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
 }
 
-.seal-swatch.is-selected {
-    border-color: var(--text);
+.template-card__text p {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.5;
 }
-
-.seal-swatch--blue { background: radial-gradient(circle at 32% 28%, #5c85ba, #2f5586 55%, #16263d 100%); }
-.seal-swatch--red { background: radial-gradient(circle at 32% 28%, #c1495a, #8a2432 55%, #3a0e14 100%); }
-.seal-swatch--green { background: radial-gradient(circle at 32% 28%, #4f9c6b, #2f6b46 55%, #12291b 100%); }
-.seal-swatch--gold { background: radial-gradient(circle at 32% 28%, #c79a3f, #8a6a1a 55%, #33270a 100%); }
 
 /* --- ボタン --- */
 
@@ -191,7 +261,7 @@ textarea:focus {
     border: 1px solid var(--border);
     border-radius: 10px;
     background: transparent;
-    color: var(--text);
+    color: var(--bg-text);
     font-family: var(--font-body);
     font-weight: 600;
     font-size: 15px;
@@ -209,7 +279,7 @@ textarea:focus {
     font-family: var(--font-mono);
     font-size: 13px;
     letter-spacing: 0.04em;
-    color: var(--text-muted);
+    color: var(--bg-text-muted);
     background: none;
     border: none;
     cursor: pointer;
@@ -253,7 +323,8 @@ textarea:focus {
     color: var(--text);
 }
 
-.share-box .btn-primary {
+.share-box .btn-primary,
+.share-box .btn-secondary {
     width: auto;
     padding: 12px 20px;
 }
@@ -263,6 +334,44 @@ textarea:focus {
     font-size: 12px;
     color: var(--accent);
     font-family: var(--font-mono);
+}
+
+/* --- 招待用URL／管理用URL --- */
+
+.url-block {
+    width: 100%;
+    text-align: left;
+    padding: 18px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+
+.url-block--share {
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.url-block--manage {
+    background: rgba(179, 39, 58, 0.06);
+    border: 1px solid var(--error);
+}
+
+.url-block__label {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bg-text);
+}
+
+.url-block__label--warning {
+    color: var(--error);
+}
+
+.url-block__desc {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    color: var(--bg-text-muted);
+    line-height: 1.6;
 }
 
 /* --- フッター --- */
@@ -276,7 +385,7 @@ textarea:focus {
 .site-footer a {
     font-family: var(--font-mono);
     font-size: 12px;
-    color: var(--text-muted);
+    color: var(--bg-text-muted);
     text-decoration: underline;
     text-underline-offset: 3px;
 }

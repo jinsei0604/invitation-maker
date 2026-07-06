@@ -13,38 +13,186 @@
     --gold: #97721a;
     --error: #b3273a;
 
+    /* 装飾背景（.bg-scene）の上に直接乗る文字の色。既定は通常の文字色と同じ */
+    --bg-text: var(--text);
+    --bg-text-muted: var(--text-muted);
+
     --font-display: "Fraunces", serif;
     --font-body: "Inter", sans-serif;
     --font-mono: "IBM Plex Mono", monospace;
 }
 
-/* 封蝋の色バリエーション（作成時に選択） */
-.scene[data-seal="blue"] {
+/* テンプレート（テーマ）ごとの配色バリエーション。<body> に付与されるクラスで切り替える */
+body.theme-standard {
     --accent: #2f5586;
     --accent-hover: #223f66;
     --wax-highlight: #5c85ba;
     --accent-rgb: 47, 85, 134;
 }
 
-.scene[data-seal="red"] {
-    --accent: #8a2432;
-    --accent-hover: #6c1c27;
-    --wax-highlight: #c1495a;
-    --accent-rgb: 138, 36, 50;
+body.theme-wedding {
+    --accent: #b89658;
+    --accent-hover: #8f7440;
+    --wax-highlight: #e6d5a8;
+    --accent-rgb: 184, 150, 88;
 }
 
-.scene[data-seal="green"] {
-    --accent: #2f6b46;
-    --accent-hover: #235135;
-    --wax-highlight: #4f9c6b;
-    --accent-rgb: 47, 107, 70;
+body.theme-matsuri {
+    --accent: #a6332c;
+    --accent-hover: #7f241e;
+    --wax-highlight: #d46a5a;
+    --accent-rgb: 166, 51, 44;
 }
 
-.scene[data-seal="gold"] {
-    --accent: #8a6a1a;
-    --accent-hover: #6c5314;
-    --wax-highlight: #c79a3f;
-    --accent-rgb: 138, 106, 26;
+/* 背景が暗い夜空になる（#bgSceneがある画面だけ）ため、背景に直接乗る文字だけ明るい色にする。
+   manage.htmlのように#bgSceneを持たない（＝背景が暗くならない）画面には適用しない。
+   （.paper や .event-meta など白いカードの上の文字は var(--text) のままでよい） */
+body.theme-matsuri:has(#bgScene) {
+    --bg-text: #f7ece0;
+    --bg-text-muted: #cdb9d8;
+}
+
+/* --- テンプレート背景（invite.html / create.html 共通。#bgScene がある画面にだけ効く） --- */
+
+.bg-scene {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/* 上下に固定の高さで貼り付けることで、画面の縦横比が変わっても
+   上部（提灯・ガーランド）や下部（屋台・アーチ）が切れないようにする */
+.bg-scene__top,
+.bg-scene__bottom {
+    position: absolute;
+    left: 0;
+    width: 100%;
+}
+
+.bg-scene__top {
+    top: 0;
+    height: 150px;
+}
+
+.bg-scene__bottom {
+    bottom: 0;
+    height: 200px;
+}
+
+body.theme-wedding .bg-scene {
+    background: linear-gradient(180deg, #fbeaf0 0%, #fdf1e2 45%, #f3dcb8 100%);
+}
+
+body.theme-matsuri .bg-scene {
+    background: linear-gradient(180deg, #171331 0%, #241d42 55%, #3a2440 100%);
+}
+
+/* 提灯・グローブライト共通の「持続的に、少しずつタイミングをずらして光る」演出 */
+.glow-dot {
+    animation: glow-pulse 2.4s ease-in-out infinite;
+    animation-delay: var(--glow-delay, 0s);
+}
+
+@keyframes glow-pulse {
+    0%, 100% { opacity: 0.75; }
+    50% { opacity: 1; }
+}
+
+/* wedding限定：中央上部を覆う透け感のある白いカーテンと、手前から奥（消失点）へ
+   転がるように伸びるバージンロード。封をタップした瞬間（#bgSceneに is-open が付いたとき）に発火する */
+.bg-scene__curtain {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 50%;
+    background: repeating-linear-gradient(90deg,
+        rgba(255,255,255,0.55) 0px, rgba(255,255,255,0.55) 18px,
+        rgba(255,255,255,0.32) 18px, rgba(255,255,255,0.32) 36px);
+    backdrop-filter: blur(2px);
+    box-shadow: 4px 0 16px rgba(43, 38, 32, 0.05);
+    z-index: 1;
+    transition: transform 1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.bg-scene__curtain--left {
+    left: 0;
+    transform-origin: left;
+}
+
+.bg-scene__curtain--right {
+    right: 0;
+    transform-origin: right;
+}
+
+#bgScene.is-open .bg-scene__curtain--left {
+    transform: translateX(-100%);
+}
+
+#bgScene.is-open .bg-scene__curtain--right {
+    transform: translateX(100%);
+}
+
+/* 手前（画面下）ほど幅広、奥＝消失点（画面の縦中央あたり）ほど細くなる台形。
+   .bg-scene__aisle-clip の高さが0→50%に伸びることで、手前から奥へ向けて
+   徐々に見えるようになる（伸縮させないので「カードが伸びる」ようには見えない） */
+.bg-scene__aisle-clip {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 26%;
+    height: 0;
+    overflow: hidden;
+    transform: translateX(-50%);
+    transition: height 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+}
+
+#bgScene.is-open .bg-scene__aisle-clip {
+    height: 50%;
+}
+
+.bg-scene__aisle {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 50vh;
+    clip-path: polygon(32% 0%, 68% 0%, 100% 100%, 0% 100%);
+    background: linear-gradient(180deg, #b5262a 0%, #8f1c20 100%);
+    box-shadow: 0 0 20px rgba(181, 38, 42, 0.2);
+}
+
+/* 転がっていく巻物っぽい見た目のアクセント。手前から奥へ移動しながら消える */
+.bg-scene__aisle-roll {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 26%;
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #e2726c, #8f1c20);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    transform: translate(-50%, 50%);
+    opacity: 1;
+    transition:
+        bottom 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s,
+        width 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s,
+        opacity 0.2s ease 1.25s;
+}
+
+#bgScene.is-open .bg-scene__aisle-roll {
+    bottom: 50%;
+    width: 13%;
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bg-scene__curtain,
+    .bg-scene__aisle-clip,
+    .bg-scene__aisle-roll {
+        transition: none !important;
+    }
 }
 
 * {
@@ -65,6 +213,8 @@ body {
 }
 
 .stage {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 480px;
 }
@@ -187,6 +337,13 @@ body {
     transform: rotate(4deg);
 }
 
+/* wedding / matsuri は絵柄が分かりにくかったため、標準より大きく表示する */
+body.theme-wedding .seal__glyph,
+body.theme-matsuri .seal__glyph {
+    width: 50px;
+    height: 50px;
+}
+
 .seal--gone {
     background: var(--surface);
     border: 1px dashed var(--border);
@@ -306,6 +463,12 @@ body {
     height: 22px;
 }
 
+body.theme-wedding .seal--onflap .seal__glyph,
+body.theme-matsuri .seal--onflap .seal__glyph {
+    width: 30px;
+    height: 30px;
+}
+
 /* --- アニメーション開始トリガー（.is-opening が付くと発火） --- */
 
 .envelope-scene.is-opening .envelope__flap {
@@ -355,7 +518,7 @@ body {
     font-family: var(--font-mono);
     font-size: 12px;
     letter-spacing: 0.18em;
-    color: var(--text-muted);
+    color: var(--bg-text-muted);
     margin: 0 0 10px;
 }
 
@@ -369,12 +532,12 @@ h1 {
     font-size: 26px;
     line-height: 1.4;
     margin: 0 0 10px;
-    color: var(--text);
+    color: var(--bg-text);
 }
 
 .sub {
     font-size: 14px;
-    color: var(--text-muted);
+    color: var(--bg-text-muted);
     margin: 0 0 24px;
     line-height: 1.7;
 }
@@ -389,7 +552,7 @@ h1 {
     font-family: var(--font-mono);
     font-size: 12px;
     letter-spacing: 0.08em;
-    color: var(--text-muted);
+    color: var(--bg-text-muted);
     margin: 0;
 }
 
@@ -405,7 +568,7 @@ h1 {
 .label {
     font-family: var(--font-mono);
     font-size: 13px;
-    color: var(--text-muted);
+    color: var(--bg-text-muted);
     letter-spacing: 0.04em;
 }
 
@@ -414,6 +577,204 @@ h1 {
     font-size: 13px;
     color: var(--error);
     font-family: var(--font-mono);
+}
+
+/* --- フォーム部品（出欠フォームで使用） --- */
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.field__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bg-text);
+}
+
+.required {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--error);
+    border: 1px solid var(--error);
+    border-radius: 4px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+input[type="text"],
+textarea {
+    width: 100%;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+textarea {
+    resize: vertical;
+    line-height: 1.7;
+}
+
+input:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 14px 16px;
+    border: none;
+    border-radius: 10px;
+    background: var(--accent);
+    color: #f5eee8;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-secondary {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--bg-text);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--accent-soft);
+}
+
+/* --- 出欠フォーム --- */
+
+.rsvp {
+    width: 100%;
+    text-align: left;
+    margin-top: 20px;
+}
+
+.rsvp__heading {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    margin: 0 0 14px;
+    color: var(--bg-text);
+}
+
+#rsvpForm {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.rsvp-attend-picker {
+    display: flex;
+    gap: 10px;
+}
+
+.rsvp-attend-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.rsvp-attend-btn:hover {
+    border-color: var(--accent);
+}
+
+.rsvp-attend-btn.is-selected {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #f5eee8;
+}
+
+.schedule-vote-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.schedule-vote-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.schedule-vote-option input {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--accent);
+}
+
+.rsvp-done {
+    width: 100%;
+    text-align: left;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+
+.rsvp-done h2 {
+    margin: 0 0 6px;
+    color: var(--text);
+}
+
+.rsvp-done p.sub {
+    margin: 0 0 14px;
+    color: var(--text-muted);
+}
+
+.rsvp-done .btn-secondary {
+    width: auto;
+    padding: 10px 18px;
+    color: var(--text);
 }
 
 .event-meta {
@@ -478,4 +839,94 @@ h1 {
     white-space: pre-wrap;
     word-break: break-word;
     margin: 0;
+}
+
+/* --- テンプレート演出（開封直後に1〜2秒だけ再生） --- */
+
+.effect-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 60;
+    overflow: hidden;
+}
+
+/* 結婚式：花びらが舞い散る */
+.petal {
+    position: absolute;
+    top: -24px;
+    background: radial-gradient(circle at 30% 30%, #fff5f5, var(--wax-highlight) 75%);
+    border-radius: 60% 0 60% 0;
+    opacity: 0;
+    animation-name: petal-fall;
+    animation-timing-function: ease-in;
+    animation-fill-mode: forwards;
+}
+
+@keyframes petal-fall {
+    0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+    10% { opacity: 0.9; }
+    50% { transform: translate(var(--drift, 40px), 170px) rotate(calc(var(--rot, 280deg) * 0.5)); }
+    100% { opacity: 0; transform: translate(calc(var(--drift, 40px) * -1), 340px) rotate(var(--rot, 280deg)); }
+}
+
+/* お祭り：花火の打ち上げ（発光する光点が上昇する） */
+.firework__launch {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    margin: -2px 0 0 -2px;
+    border-radius: 50%;
+    background: #fff4c2;
+    box-shadow: 0 0 6px 2px rgba(255, 220, 150, 0.8);
+    opacity: 0;
+    animation-name: firework-launch;
+    animation-duration: 0.42s;
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+}
+
+@keyframes firework-launch {
+    0% { opacity: 0.9; transform: translateY(140px) scale(1); }
+    85% { opacity: 0.9; }
+    100% { opacity: 0; transform: translateY(0) scale(0.6); }
+}
+
+/* お祭り：花火が開いて放射状に広がる */
+.firework {
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
+.firework__spark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0;
+    animation-name: spark-burst;
+    animation-duration: 1s;
+    animation-timing-function: ease-out;
+    animation-fill-mode: forwards;
+}
+
+@keyframes spark-burst {
+    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .petal, .firework__spark, .firework__launch {
+        animation: none !important;
+        display: none;
+    }
+
+    .glow-dot {
+        animation: none !important;
+    }
 }
