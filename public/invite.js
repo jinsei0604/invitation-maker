@@ -130,7 +130,6 @@ const rsvpDoneSub = document.getElementById("rsvpDoneSub");
 const rsvpForm = document.getElementById("rsvpForm");
 const rsvpNameInput = document.getElementById("rsvpName");
 const rsvpRoleInput = document.getElementById("rsvpRole");
-const rsvpAgeInput = document.getElementById("rsvpAge");
 const rsvpCommentInput = document.getElementById("rsvpComment");
 const rsvpAttendPicker = document.getElementById("rsvpAttendPicker");
 const rsvpAnotherBtn = document.getElementById("rsvpAnotherBtn");
@@ -186,7 +185,7 @@ rsvpForm.addEventListener("submit", async (e) => {
         return;
     }
     if (!selectedAttend) {
-        rsvpError.textContent = "ご出欠を選択してください";
+        rsvpError.textContent = "出欠を選択してください";
         rsvpError.hidden = false;
         return;
     }
@@ -203,7 +202,6 @@ rsvpForm.addEventListener("submit", async (e) => {
                 attending: selectedAttend,
                 comment: rsvpCommentInput.value.trim(),
                 role_grade: rsvpRoleInput.value.trim(),
-                age: rsvpAgeInput.value.trim(),
             }),
         });
         const data = await res.json().catch(() => ({}));
@@ -228,7 +226,6 @@ const scheduleDoneSub = document.getElementById("scheduleDoneSub");
 const scheduleForm = document.getElementById("scheduleForm");
 const scheduleNameInput = document.getElementById("scheduleName");
 const scheduleRoleInput = document.getElementById("scheduleRole");
-const scheduleAgeInput = document.getElementById("scheduleAge");
 const scheduleCommentInput = document.getElementById("scheduleComment");
 const scheduleVoteOptionsEl = document.getElementById("scheduleVoteOptions");
 const scheduleAnotherBtn = document.getElementById("scheduleAnotherBtn");
@@ -295,7 +292,6 @@ scheduleForm.addEventListener("submit", async (e) => {
                 selected_option_ids: selectedOptionIds,
                 comment: scheduleCommentInput.value.trim(),
                 role_grade: scheduleRoleInput.value.trim(),
-                age: scheduleAgeInput.value.trim(),
             }),
         });
         const data = await res.json().catch(() => ({}));

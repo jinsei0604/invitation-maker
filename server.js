@@ -74,9 +74,6 @@ const replyColumns = db.prepare(`PRAGMA table_info(replies)`).all();
 if (!replyColumns.some((col) => col.name === "role_grade")) {
     db.exec(`ALTER TABLE replies ADD COLUMN role_grade TEXT`);
 }
-if (!replyColumns.some((col) => col.name === "age")) {
-    db.exec(`ALTER TABLE replies ADD COLUMN age TEXT`);
-}
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS schedule_options (
@@ -94,7 +91,6 @@ db.exec(`
         invitation_id TEXT NOT NULL,
         guest_name TEXT NOT NULL,
         role_grade TEXT,
-        age TEXT,
         selected_option_ids TEXT NOT NULL,
         comment TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -120,33 +116,33 @@ const statements = {
 
     // 出欠フォーム（response_type = 'rsvp'）
     insertReply: db.prepare(`
-        INSERT INTO replies (id, invitation_id, guest_name, attending, comment, role_grade, age)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO replies (id, invitation_id, guest_name, attending, comment, role_grade)
+        VALUES (?, ?, ?, ?, ?, ?)
     `),
     getReplyByNameAndRole: db.prepare(`
         SELECT id FROM replies WHERE invitation_id = ? AND guest_name = ? AND IFNULL(role_grade, '') = IFNULL(?, '')
     `),
     updateReply: db.prepare(`
-        UPDATE replies SET attending = ?, comment = ?, age = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE replies SET attending = ?, comment = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
     `),
     getRepliesByInvitationId: db.prepare(`
-        SELECT guest_name, attending, comment, role_grade, age, created_at FROM replies
+        SELECT guest_name, attending, comment, role_grade, created_at FROM replies
         WHERE invitation_id = ? ORDER BY created_at DESC
     `),
 
     // 日程調整フォーム（response_type = 'schedule'）
     insertScheduleVote: db.prepare(`
-        INSERT INTO schedule_votes (id, invitation_id, guest_name, role_grade, age, selected_option_ids, comment)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO schedule_votes (id, invitation_id, guest_name, role_grade, selected_option_ids, comment)
+        VALUES (?, ?, ?, ?, ?, ?)
     `),
     getScheduleVoteByNameAndRole: db.prepare(`
         SELECT id FROM schedule_votes WHERE invitation_id = ? AND guest_name = ? AND IFNULL(role_grade, '') = IFNULL(?, '')
     `),
     updateScheduleVote: db.prepare(`
-        UPDATE schedule_votes SET selected_option_ids = ?, comment = ?, age = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE schedule_votes SET selected_option_ids = ?, comment = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
     `),
     getScheduleVotesByInvitationId: db.prepare(`
-        SELECT guest_name, role_grade, age, selected_option_ids, comment, created_at FROM schedule_votes
+        SELECT guest_name, role_grade, selected_option_ids, comment, created_at FROM schedule_votes
         WHERE invitation_id = ? ORDER BY created_at DESC
     `),
 };
@@ -274,7 +270,7 @@ app.post("/invitations/:id/replies", (req, res) => {
         return res.status(404).json({ error: "この招待状は見つかりません" });
     }
 
-    const { guest_name, attending, comment, role_grade, age } = req.body || {};
+    const { guest_name, attending, comment, role_grade } = req.body || {};
 
     if (!guest_name || !String(guest_name).trim()) {
         return res.status(400).json({ error: "お名前を入力してください" });
@@ -286,14 +282,13 @@ app.post("/invitations/:id/replies", (req, res) => {
     const trimmedName = String(guest_name).trim();
     const trimmedComment = comment ? String(comment).trim() : null;
     const trimmedRole = role_grade ? String(role_grade).trim() : null;
-    const trimmedAge = age ? String(age).trim() : null;
 
     // 同じ招待状に「同じ名前＋同じ役職・学年」の回答が既にある場合は、新規追加ではなく上書きする
     // （出席→欠席に変更したい場合などに重複行を作らないため。role_gradeも一致条件に含めることで、
     //   同姓同名の別人がいてもrole_gradeが異なれば別回答として扱える）
     const existingReply = statements.getReplyByNameAndRole.get(invitation.id, trimmedName, trimmedRole);
     if (existingReply) {
-        statements.updateReply.run(attending, trimmedComment, trimmedAge, existingReply.id);
+        statements.updateReply.run(attending, trimmedComment, existingReply.id);
     } else {
         statements.insertReply.run(
             crypto.randomUUID(),
@@ -302,7 +297,6 @@ app.post("/invitations/:id/replies", (req, res) => {
             attending,
             trimmedComment,
             trimmedRole,
-            trimmedAge,
         );
     }
 
@@ -316,7 +310,7 @@ app.post("/invitations/:id/schedule-votes", (req, res) => {
         return res.status(404).json({ error: "この招待状は見つかりません" });
     }
 
-    const { guest_name, selected_option_ids, comment, role_grade, age } = req.body || {};
+    const { guest_name, selected_option_ids, comment, role_grade } = req.body || {};
 
     if (!guest_name || !String(guest_name).trim()) {
         return res.status(400).json({ error: "お名前を入力してください" });
@@ -334,19 +328,17 @@ app.post("/invitations/:id/schedule-votes", (req, res) => {
     const trimmedName = String(guest_name).trim();
     const trimmedComment = comment ? String(comment).trim() : null;
     const trimmedRole = role_grade ? String(role_grade).trim() : null;
-    const trimmedAge = age ? String(age).trim() : null;
     const selectionJson = JSON.stringify(cleanedSelection);
 
     const existingVote = statements.getScheduleVoteByNameAndRole.get(invitation.id, trimmedName, trimmedRole);
     if (existingVote) {
-        statements.updateScheduleVote.run(selectionJson, trimmedComment, trimmedAge, existingVote.id);
+        statements.updateScheduleVote.run(selectionJson, trimmedComment, existingVote.id);
     } else {
         statements.insertScheduleVote.run(
             crypto.randomUUID(),
             invitation.id,
             trimmedName,
             trimmedRole,
-            trimmedAge,
             selectionJson,
             trimmedComment,
         );

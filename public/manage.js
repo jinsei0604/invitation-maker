@@ -39,10 +39,9 @@ function escapeHtml(value) {
 }
 
 function metaLine(reply) {
-    const parts = [];
-    if (reply.role_grade) parts.push(escapeHtml(reply.role_grade));
-    if (reply.age) parts.push(`${escapeHtml(reply.age)}歳`);
-    return parts.length ? `<p class="rsvp-reply-card__meta">${parts.join(" / ")}</p>` : "";
+    return reply.role_grade
+        ? `<p class="rsvp-reply-card__meta">${escapeHtml(reply.role_grade)}</p>`
+        : "";
 }
 
 function guestDisplayName(reply) {
@@ -107,11 +106,10 @@ function renderReplies(replies) {
 
 function buildRsvpExcelText(replies) {
     const sanitize = (value) => String(value || "").replace(/\t/g, " ").replace(/\r?\n/g, " ");
-    const header = ["お名前", "役職・学年", "年齢", "出欠", "コメント", "回答日時"];
+    const header = ["お名前", "役職・学年", "出欠", "コメント", "回答日時"];
     const rows = replies.map((reply) => [
         sanitize(reply.guest_name),
         sanitize(reply.role_grade),
-        sanitize(reply.age),
         reply.attending === "yes" ? "出席" : "欠席",
         sanitize(reply.comment),
         formatDateTime(reply.created_at),
@@ -233,11 +231,10 @@ function buildScheduleExcelText(votes, options) {
     const labelById = {};
     options.forEach((option) => { labelById[option.id] = option.option_label; });
 
-    const header = ["お名前", "役職・学年", "年齢", "参加できる候補日", "コメント", "回答日時"];
+    const header = ["お名前", "役職・学年", "参加できる候補日", "コメント", "回答日時"];
     const rows = votes.map((vote) => [
         sanitize(vote.guest_name),
         sanitize(vote.role_grade),
-        sanitize(vote.age),
         sanitize(vote.selected_option_ids.map((optionId) => labelById[optionId]).filter(Boolean).join("、")),
         sanitize(vote.comment),
         formatDateTime(vote.created_at),
