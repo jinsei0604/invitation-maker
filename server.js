@@ -114,6 +114,10 @@ const statements = {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     getById: db.prepare(`SELECT * FROM invitations WHERE id = ?`),
+    updateInvitation: db.prepare(`
+        UPDATE invitations SET title = ?, event_datetime = ?, location = ?, message = ?, response_deadline = ?, capacity = ?
+        WHERE id = ?
+    `),
 
     insertScheduleOption: db.prepare(`
         INSERT INTO schedule_options (id, invitation_id, option_label, sort_order)
@@ -160,6 +164,28 @@ const statements = {
         WHERE invitation_id = ? ORDER BY created_at DESC
     `),
 };
+
+// 回答期限の入力値を検証してISO文字列に変換する（作成・編集の両方で使う）
+function parseResponseDeadline(rawValue) {
+    if (!rawValue || !String(rawValue).trim()) return { value: null };
+    const deadlineDate = new Date(String(rawValue).trim());
+    if (Number.isNaN(deadlineDate.getTime())) {
+        return { error: "回答期限の形式が正しくありません" };
+    }
+    return { value: deadlineDate.toISOString() };
+}
+
+// 定員の入力値を検証する。日程調整には座席数の概念がないためRSVPのみ有効（作成・編集の両方で使う）
+function parseCapacity(rawValue, responseType) {
+    if (responseType !== "rsvp" || rawValue === undefined || rawValue === null || String(rawValue).trim() === "") {
+        return { value: null };
+    }
+    const capacityNum = parseInt(rawValue, 10);
+    if (!Number.isInteger(capacityNum) || capacityNum < 1) {
+        return { error: "定員は1以上の整数で入力してください" };
+    }
+    return { value: capacityNum };
+}
 
 // 回答期限・定員（RSVPのみ）による自動締め切りを判定する
 function getClosedState(invitation) {
@@ -247,24 +273,16 @@ app.post("/invitations", async (req, res) => {
         }
     }
 
-    let parsedDeadline = null;
-    if (response_deadline && String(response_deadline).trim()) {
-        const deadlineDate = new Date(String(response_deadline).trim());
-        if (Number.isNaN(deadlineDate.getTime())) {
-            return res.status(400).json({ error: "回答期限の形式が正しくありません" });
-        }
-        parsedDeadline = deadlineDate.toISOString();
+    const deadlineResult = parseResponseDeadline(response_deadline);
+    if (deadlineResult.error) {
+        return res.status(400).json({ error: deadlineResult.error });
     }
-
-    // 定員はRSVP形式のみ意味を持つ（日程調整には座席数の概念がないため）
-    let parsedCapacity = null;
-    if (responseType === "rsvp" && capacity !== undefined && capacity !== null && String(capacity).trim() !== "") {
-        const capacityNum = parseInt(capacity, 10);
-        if (!Number.isInteger(capacityNum) || capacityNum < 1) {
-            return res.status(400).json({ error: "定員は1以上の整数で入力してください" });
-        }
-        parsedCapacity = capacityNum;
+    const capacityResult = parseCapacity(capacity, responseType);
+    if (capacityResult.error) {
+        return res.status(400).json({ error: capacityResult.error });
     }
+    const parsedDeadline = deadlineResult.value;
+    const parsedCapacity = capacityResult.value;
 
     const templateId = TEMPLATE_IDS.includes(template_id) ? template_id : "standard";
     const id = crypto.randomUUID();
@@ -321,6 +339,72 @@ app.get("/invitations/:id", (req, res) => {
         closed: closedState.closed,
         closed_reason: closedState.reason,
     });
+});
+
+// 編集ページ・複製機能用に、招待状の全項目を返す。manage_token が一致した場合のみ（招待状の作成者専用）
+app.get("/invitations/:id/details", (req, res) => {
+    const invitation = statements.getById.get(req.params.id);
+    if (!invitation) {
+        return res.status(404).json({ error: "この招待状は見つかりません" });
+    }
+    if (!req.query.token || req.query.token !== invitation.manage_token) {
+        return res.status(403).json({ error: "アクセスできません" });
+    }
+
+    const responseType = invitation.response_type || "rsvp";
+
+    res.json({
+        title: invitation.title,
+        event_datetime: invitation.event_datetime,
+        location: invitation.location,
+        message: invitation.message,
+        template_id: invitation.template_id || "standard",
+        response_type: responseType,
+        response_deadline: invitation.response_deadline,
+        capacity: invitation.capacity,
+        schedule_options: responseType === "schedule" ? statements.getScheduleOptions.all(invitation.id) : [],
+    });
+});
+
+// 招待状の内容を編集する。回答方式・候補日は既存の回答と紐づくため変更不可（招待状の作成者専用）
+app.put("/invitations/:id", (req, res) => {
+    const invitation = statements.getById.get(req.params.id);
+    if (!invitation) {
+        return res.status(404).json({ error: "この招待状は見つかりません" });
+    }
+    if (!req.query.token || req.query.token !== invitation.manage_token) {
+        return res.status(403).json({ error: "アクセスできません" });
+    }
+
+    const { title, event_datetime, location, message, response_deadline, capacity } = req.body || {};
+
+    if (!title || !String(title).trim()) {
+        return res.status(400).json({ error: "タイトルを入力してください" });
+    }
+    if (!message || !String(message).trim()) {
+        return res.status(400).json({ error: "メッセージ本文を入力してください" });
+    }
+
+    const deadlineResult = parseResponseDeadline(response_deadline);
+    if (deadlineResult.error) {
+        return res.status(400).json({ error: deadlineResult.error });
+    }
+    const capacityResult = parseCapacity(capacity, invitation.response_type || "rsvp");
+    if (capacityResult.error) {
+        return res.status(400).json({ error: capacityResult.error });
+    }
+
+    statements.updateInvitation.run(
+        String(title).trim(),
+        event_datetime ? String(event_datetime) : null,
+        location ? String(location).trim() : null,
+        String(message).trim(),
+        deadlineResult.value,
+        capacityResult.value,
+        invitation.id,
+    );
+
+    res.json({ ok: true });
 });
 
 // 出欠の返信を保存する。招待状のページ内で完結させ、別ページには遷移させない

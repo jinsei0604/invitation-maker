@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>招待状を編集 | デジタル招待状メーカー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="invite.css">
+<link rel="stylesheet" href="create.css">
+</head>
+<body class="theme-standard">
+
+<div class="bg-scene" id="bgScene" aria-hidden="true"></div>
+
+<div class="page">
+
+    <div id="state-loading">
+        <p class="label">確認しています…</p>
+    </div>
+
+    <div id="state-error" hidden>
+        <p class="eyebrow">ERROR</p>
+        <h1 id="errorTitle">アクセスできません</h1>
+        <p class="sub" id="errorSub">URLが正しいかご確認ください。</p>
+    </div>
+
+    <section id="state-edit" hidden>
+        <p class="eyebrow">EDIT</p>
+        <h1>招待状を編集</h1>
+        <p class="sub">保存しても、招待相手に送ったURLはそのまま変わりません。</p>
+
+        <form id="editForm">
+            <label class="field">
+                <span class="field__label">タイトル <span class="required">必須</span></span>
+                <input type="text" id="editTitle" maxlength="60" required>
+            </label>
+
+            <label class="field">
+                <span class="field__label">日時</span>
+                <input type="datetime-local" id="editDatetime">
+            </label>
+
+            <label class="field">
+                <span class="field__label">場所</span>
+                <input type="text" id="editLocation" maxlength="120">
+            </label>
+
+            <label class="field">
+                <span class="field__label">メッセージ本文 <span class="required">必須</span></span>
+                <textarea id="editMessage" rows="6" maxlength="1000" required></textarea>
+            </label>
+
+            <label class="field">
+                <span class="field__label">回答期限（任意）</span>
+                <input type="datetime-local" id="editDeadline">
+            </label>
+
+            <label class="field" id="editCapacityField">
+                <span class="field__label">定員（任意）</span>
+                <input type="number" id="editCapacity" min="1" step="1" placeholder="例：50">
+            </label>
+
+            <p class="error-text" id="editError" hidden></p>
+            <p class="copied-note" id="savedNote" hidden>保存しました</p>
+
+            <button type="submit" class="btn-primary">保存する</button>
+            <a class="link-btn" id="backToManageLink" href="#">管理ページに戻る</a>
+        </form>
+    </section>
+
+</div>
+
+<script src="edit.js"></script>
+</body>
+</html>

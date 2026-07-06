@@ -316,6 +316,8 @@ async function init() {
     const invitation = rsvpResult.data;
     applyTemplateTheme(invitation.template_id);
     document.getElementById("inviteTitle").textContent = invitation.title;
+    document.getElementById("editInviteLink").href = `edit.html?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`;
+    document.getElementById("duplicateInviteLink").href = `create.html?duplicateId=${encodeURIComponent(id)}&duplicateToken=${encodeURIComponent(token)}`;
 
     const isSchedule = invitation.response_type === "schedule";
     document.getElementById("rsvpView").hidden = isSchedule;

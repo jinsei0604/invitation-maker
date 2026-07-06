@@ -13,6 +13,19 @@
     text-align: center;
 }
 
+/* --- 編集・複製リンク --- */
+
+.manage-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-top: 10px;
+}
+
+.manage-actions .link-btn {
+    margin-top: 0;
+}
+
 /* --- 締切・定員などのステータス表示 --- */
 
 .status-banner {

@@ -331,4 +331,65 @@ function setupCopyButton(buttonId, inputEl, noteId) {
 setupCopyButton("copyShareBtn", shareUrlInput, "copiedShareNote");
 setupCopyButton("copyManageBtn", manageUrlInput, "copiedManageNote");
 
-showStep("template");
+// --- 既存の招待状の内容を複製して、この画面から新規作成できるようにする ---
+
+// ISO文字列 → <input type="datetime-local"> にそのまま入れられるローカル時刻表記に変換する
+function toDatetimeLocalValue(isoString) {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function selectResponseType(responseType) {
+    selectedResponseType = responseType;
+    responseTypePicker.querySelectorAll(".response-type-btn").forEach((el) => {
+        el.classList.toggle("is-selected", el.dataset.responseType === responseType);
+    });
+    scheduleOptionsField.hidden = responseType !== "schedule";
+    capacityField.hidden = responseType === "schedule";
+}
+
+async function prefillFromDuplicateSource(duplicateId, duplicateToken) {
+    const res = await fetch(`/invitations/${encodeURIComponent(duplicateId)}/details?token=${encodeURIComponent(duplicateToken)}`);
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => ({}));
+
+    selectTemplate(TEMPLATES.some((t) => t.id === data.template_id) ? data.template_id : "standard");
+    titleInput.value = data.title || "";
+    datetimeInput.value = toDatetimeLocalValue(data.event_datetime);
+    locationInput.value = data.location || "";
+    messageInput.value = data.message || "";
+    deadlineInput.value = toDatetimeLocalValue(data.response_deadline);
+
+    selectResponseType(data.response_type === "schedule" ? "schedule" : "rsvp");
+    if (data.response_type === "schedule") {
+        // 候補日そのものは表示用の文字列でしか保存していないため日時を復元できない。
+        // 元の候補日数だけ空の入力欄を用意し、日時は入力し直してもらう
+        scheduleOptionsList.innerHTML = "";
+        const count = Math.max((data.schedule_options || []).length, 2);
+        for (let i = 0; i < count; i += 1) addScheduleOptionRow();
+    } else {
+        capacityInput.value = data.capacity || "";
+    }
+
+    return true;
+}
+
+async function init() {
+    const duplicateId = new URLSearchParams(window.location.search).get("duplicateId");
+    const duplicateToken = new URLSearchParams(window.location.search).get("duplicateToken");
+
+    if (duplicateId && duplicateToken) {
+        const ok = await prefillFromDuplicateSource(duplicateId, duplicateToken);
+        if (ok) {
+            showStep("form");
+            return;
+        }
+    }
+
+    showStep("template");
+}
+
+init();
