@@ -137,6 +137,11 @@
                             </div>
                         </div>
 
+                        <label class="field" id="rsvpCompanionField" hidden>
+                            <span class="field__label">同伴者人数</span>
+                            <input type="number" id="rsvpCompanionCount" min="0" max="20" step="1" value="0" inputmode="numeric">
+                        </label>
+
                         <label class="field">
                             <span class="field__label">ひとことメッセージ</span>
                             <textarea id="rsvpComment" rows="3" maxlength="300"></textarea>
@@ -190,6 +195,11 @@
                     <p class="sub" id="scheduleDoneSub"></p>
                     <button type="button" class="btn-secondary" id="scheduleAnotherBtn">別の方の回答を送る</button>
                 </div>
+            </div>
+
+            <div class="rsvp" id="responseClosedSection" hidden>
+                <h2 class="rsvp__heading">受付は終了しました</h2>
+                <p class="sub" id="responseClosedReason"></p>
             </div>
 
             <p class="sub sub--quiet">このページはいつでも開き直せます。ブックマークしてご確認ください。</p>

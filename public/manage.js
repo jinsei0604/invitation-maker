@@ -32,6 +32,24 @@ function formatDateTime(value) {
     });
 }
 
+function renderStatusBanner(data) {
+    const banner = document.getElementById("statusBanner");
+    const parts = [];
+    if (data.response_deadline) parts.push(`回答期限: ${formatDateTime(data.response_deadline)}`);
+    if (data.capacity) parts.push(`定員: ${data.capacity}人`);
+    if (data.closed) {
+        const reasonLabel = data.closed_reason === "capacity" ? "定員に達したため" : "回答期限を過ぎたため";
+        parts.push(`現在、${reasonLabel}受付を終了しています`);
+    }
+    if (!parts.length) {
+        banner.hidden = true;
+        return;
+    }
+    banner.hidden = false;
+    banner.classList.toggle("status-banner--closed", !!data.closed);
+    banner.textContent = parts.join(" ／ ");
+}
+
 function escapeHtml(value) {
     const div = document.createElement("div");
     div.textContent = value;
@@ -47,6 +65,7 @@ function metaLine(reply) {
 function guestDisplayName(reply) {
     const parts = [reply.guest_name];
     if (reply.role_grade) parts.push(`（${reply.role_grade}）`);
+    if (reply.companion_count) parts.push(` +${reply.companion_count}名`);
     return parts.join("");
 }
 
@@ -86,6 +105,9 @@ function renderReplies(replies) {
     listEl.innerHTML = replies.map((reply) => {
         const badgeClass = reply.attending === "yes" ? "rsvp-reply-card__badge--yes" : "rsvp-reply-card__badge--no";
         const badgeLabel = reply.attending === "yes" ? "出席" : "欠席";
+        const companionBadge = reply.companion_count
+            ? `<span class="rsvp-reply-card__badge rsvp-reply-card__badge--companion">+${reply.companion_count}名</span>`
+            : "";
         const comment = reply.comment
             ? `<p class="rsvp-reply-card__comment">${escapeHtml(reply.comment)}</p>`
             : "";
@@ -94,7 +116,10 @@ function renderReplies(replies) {
             <div class="rsvp-reply-card">
                 <div class="rsvp-reply-card__head">
                     <span class="rsvp-reply-card__name">${escapeHtml(reply.guest_name)}</span>
-                    <span class="rsvp-reply-card__badge ${badgeClass}">${badgeLabel}</span>
+                    <span class="rsvp-reply-card__badge-group">
+                        <span class="rsvp-reply-card__badge ${badgeClass}">${badgeLabel}</span>
+                        ${companionBadge}
+                    </span>
                 </div>
                 ${metaLine(reply)}
                 ${comment}
@@ -106,11 +131,12 @@ function renderReplies(replies) {
 
 function buildRsvpExcelText(replies) {
     const sanitize = (value) => String(value || "").replace(/\t/g, " ").replace(/\r?\n/g, " ");
-    const header = ["お名前", "役職・学年", "出欠", "コメント", "回答日時"];
+    const header = ["お名前", "役職・学年", "出欠", "同伴者人数", "コメント", "回答日時"];
     const rows = replies.map((reply) => [
         sanitize(reply.guest_name),
         sanitize(reply.role_grade),
         reply.attending === "yes" ? "出席" : "欠席",
+        reply.attending === "yes" ? String(reply.companion_count || 0) : "",
         sanitize(reply.comment),
         formatDateTime(reply.created_at),
     ]);
@@ -154,8 +180,10 @@ async function loadRsvpView() {
 
     document.getElementById("countYes").textContent = data.counts.yes;
     document.getElementById("countNo").textContent = data.counts.no;
+    document.getElementById("countTotalAttendees").textContent = data.counts.totalAttendees;
     currentReplies = data.replies;
     renderReplies(data.replies);
+    renderStatusBanner(data);
     return { ok: true, data };
 }
 
@@ -255,6 +283,7 @@ async function loadScheduleView() {
     currentVotes = data.votes;
     renderScheduleTally(data.options, data.counts, data.votes.length);
     renderScheduleVotes(data.votes, data.options);
+    renderStatusBanner(data);
     return { ok: true, data };
 }
 

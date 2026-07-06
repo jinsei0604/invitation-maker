@@ -587,6 +587,10 @@ h1 {
     gap: 8px;
 }
 
+.field[hidden] {
+    display: none;
+}
+
 .field__label {
     font-size: 13px;
     font-weight: 600;

@@ -29,6 +29,7 @@
         <p class="eyebrow">MANAGEMENT</p>
         <h1 id="inviteTitle"></h1>
         <p class="sub">このページは招待相手には送らないでください。</p>
+        <div class="status-banner" id="statusBanner" hidden></div>
 
         <!-- 出欠フォーム用 -->
         <div id="rsvpView" hidden>
@@ -41,12 +42,16 @@
                     <span class="rsvp-summary__count" id="countNo">0</span>
                     <span class="rsvp-summary__label">欠席</span>
                 </button>
+                <div class="rsvp-summary__item rsvp-summary__item--total">
+                    <span class="rsvp-summary__count" id="countTotalAttendees">0</span>
+                    <span class="rsvp-summary__label">参加予定人数</span>
+                </div>
             </div>
-            <p class="summary-hint">人数をタップすると名前の一覧が見られます。</p>
+            <p class="summary-hint">人数をタップすると名前の一覧が見られます。「参加予定人数」は同伴者を含む合計です。</p>
 
             <div class="rsvp-export">
                 <button type="button" class="btn-secondary" id="copyExcelBtn">Excel用に一覧をコピー</button>
-                <p class="rsvp-export__note">ボタンを押すとクリップボードにコピーされます。Excelのセルに貼り付けると、そのまま列（お名前・役職学年・出欠・コメント・回答日時）に分かれます。</p>
+                <p class="rsvp-export__note">ボタンを押すとクリップボードにコピーされます。Excelのセルに貼り付けると、そのまま列（お名前・役職学年・出欠・同伴者人数・コメント・回答日時）に分かれます。</p>
                 <p class="copied-note" id="copiedExcelNote" hidden>コピーしました</p>
             </div>
 

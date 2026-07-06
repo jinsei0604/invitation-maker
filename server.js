@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
+const QRCode = require("qrcode");
 
 let DatabaseSync;
 try {
@@ -57,6 +58,12 @@ if (!existingColumns.some((col) => col.name === "manage_token")) {
 if (!existingColumns.some((col) => col.name === "response_type")) {
     db.exec(`ALTER TABLE invitations ADD COLUMN response_type TEXT DEFAULT 'rsvp'`);
 }
+if (!existingColumns.some((col) => col.name === "response_deadline")) {
+    db.exec(`ALTER TABLE invitations ADD COLUMN response_deadline TEXT`);
+}
+if (!existingColumns.some((col) => col.name === "capacity")) {
+    db.exec(`ALTER TABLE invitations ADD COLUMN capacity INTEGER`);
+}
 
 db.exec(`
     CREATE TABLE IF NOT EXISTS replies (
@@ -73,6 +80,9 @@ db.exec(`
 const replyColumns = db.prepare(`PRAGMA table_info(replies)`).all();
 if (!replyColumns.some((col) => col.name === "role_grade")) {
     db.exec(`ALTER TABLE replies ADD COLUMN role_grade TEXT`);
+}
+if (!replyColumns.some((col) => col.name === "companion_count")) {
+    db.exec(`ALTER TABLE replies ADD COLUMN companion_count INTEGER DEFAULT 0`);
 }
 
 db.exec(`
@@ -100,8 +110,8 @@ db.exec(`
 
 const statements = {
     insert: db.prepare(`
-        INSERT INTO invitations (id, title, event_datetime, location, message, template_id, manage_token, response_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO invitations (id, title, event_datetime, location, message, template_id, manage_token, response_type, response_deadline, capacity)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `),
     getById: db.prepare(`SELECT * FROM invitations WHERE id = ?`),
 
@@ -116,18 +126,22 @@ const statements = {
 
     // 出欠フォーム（response_type = 'rsvp'）
     insertReply: db.prepare(`
-        INSERT INTO replies (id, invitation_id, guest_name, attending, comment, role_grade)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO replies (id, invitation_id, guest_name, attending, comment, role_grade, companion_count)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     `),
     getReplyByNameAndRole: db.prepare(`
         SELECT id FROM replies WHERE invitation_id = ? AND guest_name = ? AND IFNULL(role_grade, '') = IFNULL(?, '')
     `),
     updateReply: db.prepare(`
-        UPDATE replies SET attending = ?, comment = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
+        UPDATE replies SET attending = ?, comment = ?, companion_count = ?, created_at = CURRENT_TIMESTAMP WHERE id = ?
     `),
     getRepliesByInvitationId: db.prepare(`
-        SELECT guest_name, attending, comment, role_grade, created_at FROM replies
+        SELECT guest_name, attending, comment, role_grade, companion_count, created_at FROM replies
         WHERE invitation_id = ? ORDER BY created_at DESC
+    `),
+    getYesHeadcount: db.prepare(`
+        SELECT COALESCE(SUM(1 + IFNULL(companion_count, 0)), 0) AS total FROM replies
+        WHERE invitation_id = ? AND attending = 'yes'
     `),
 
     // 日程調整フォーム（response_type = 'schedule'）
@@ -146,6 +160,23 @@ const statements = {
         WHERE invitation_id = ? ORDER BY created_at DESC
     `),
 };
+
+// 回答期限・定員（RSVPのみ）による自動締め切りを判定する
+function getClosedState(invitation) {
+    if (invitation.response_deadline) {
+        const deadline = new Date(invitation.response_deadline);
+        if (!Number.isNaN(deadline.getTime()) && Date.now() > deadline.getTime()) {
+            return { closed: true, reason: "deadline" };
+        }
+    }
+    if ((invitation.response_type || "rsvp") === "rsvp" && invitation.capacity) {
+        const { total } = statements.getYesHeadcount.get(invitation.id);
+        if (total >= invitation.capacity) {
+            return { closed: true, reason: "capacity" };
+        }
+    }
+    return { closed: false, reason: null };
+}
 
 // --- App setup ---
 const app = express();
@@ -195,8 +226,8 @@ app.get("/", (req, res) => {
 });
 
 // フォーム内容を保存し、招待状の共有URLを発行する（完全無料なので決済は挟まない）
-app.post("/invitations", (req, res) => {
-    const { title, event_datetime, location, message, template_id, response_type, schedule_options } = req.body || {};
+app.post("/invitations", async (req, res) => {
+    const { title, event_datetime, location, message, template_id, response_type, schedule_options, response_deadline, capacity } = req.body || {};
 
     if (!title || !String(title).trim()) {
         return res.status(400).json({ error: "タイトルを入力してください" });
@@ -216,6 +247,25 @@ app.post("/invitations", (req, res) => {
         }
     }
 
+    let parsedDeadline = null;
+    if (response_deadline && String(response_deadline).trim()) {
+        const deadlineDate = new Date(String(response_deadline).trim());
+        if (Number.isNaN(deadlineDate.getTime())) {
+            return res.status(400).json({ error: "回答期限の形式が正しくありません" });
+        }
+        parsedDeadline = deadlineDate.toISOString();
+    }
+
+    // 定員はRSVP形式のみ意味を持つ（日程調整には座席数の概念がないため）
+    let parsedCapacity = null;
+    if (responseType === "rsvp" && capacity !== undefined && capacity !== null && String(capacity).trim() !== "") {
+        const capacityNum = parseInt(capacity, 10);
+        if (!Number.isInteger(capacityNum) || capacityNum < 1) {
+            return res.status(400).json({ error: "定員は1以上の整数で入力してください" });
+        }
+        parsedCapacity = capacityNum;
+    }
+
     const templateId = TEMPLATE_IDS.includes(template_id) ? template_id : "standard";
     const id = crypto.randomUUID();
     // IDとは別の値にすることで、招待状のURLを知っているだけでは管理ページに入れないようにする
@@ -230,16 +280,23 @@ app.post("/invitations", (req, res) => {
         templateId,
         manageToken,
         responseType,
+        parsedDeadline,
+        parsedCapacity,
     );
 
     cleanedOptions.forEach((label, index) => {
         statements.insertScheduleOption.run(crypto.randomUUID(), id, label, index);
     });
 
+    const shareUrl = `${BASE_URL}/invite.html?id=${id}`;
+    // 紙の招待状や当日の受付など、オンラインで完結しないシーンでも共有できるようにQRコードも発行する
+    const qrDataUrl = await QRCode.toDataURL(shareUrl, { margin: 1, width: 320 });
+
     res.json({
         id,
-        shareUrl: `${BASE_URL}/invite.html?id=${id}`,
+        shareUrl,
         manageUrl: `${BASE_URL}/manage.html?id=${id}&token=${manageToken}`,
+        qrDataUrl,
     });
 });
 
@@ -251,6 +308,7 @@ app.get("/invitations/:id", (req, res) => {
     }
 
     const responseType = invitation.response_type || "rsvp";
+    const closedState = getClosedState(invitation);
 
     res.json({
         title: invitation.title,
@@ -260,6 +318,8 @@ app.get("/invitations/:id", (req, res) => {
         template_id: invitation.template_id || "standard",
         response_type: responseType,
         schedule_options: responseType === "schedule" ? statements.getScheduleOptions.all(invitation.id) : [],
+        closed: closedState.closed,
+        closed_reason: closedState.reason,
     });
 });
 
@@ -270,7 +330,7 @@ app.post("/invitations/:id/replies", (req, res) => {
         return res.status(404).json({ error: "この招待状は見つかりません" });
     }
 
-    const { guest_name, attending, comment, role_grade } = req.body || {};
+    const { guest_name, attending, comment, role_grade, companion_count } = req.body || {};
 
     if (!guest_name || !String(guest_name).trim()) {
         return res.status(400).json({ error: "お名前を入力してください" });
@@ -282,13 +342,24 @@ app.post("/invitations/:id/replies", (req, res) => {
     const trimmedName = String(guest_name).trim();
     const trimmedComment = comment ? String(comment).trim() : null;
     const trimmedRole = role_grade ? String(role_grade).trim() : null;
+    // 欠席の場合や不正な値の場合は同伴者0人として扱う
+    const parsedCompanionCount = attending === "yes" ? parseInt(companion_count, 10) : 0;
+    const companionCount = Number.isInteger(parsedCompanionCount) && parsedCompanionCount > 0
+        ? Math.min(parsedCompanionCount, 20)
+        : 0;
 
     // 同じ招待状に「同じ名前＋同じ役職・学年」の回答が既にある場合は、新規追加ではなく上書きする
     // （出席→欠席に変更したい場合などに重複行を作らないため。role_gradeも一致条件に含めることで、
     //   同姓同名の別人がいてもrole_gradeが異なれば別回答として扱える）
     const existingReply = statements.getReplyByNameAndRole.get(invitation.id, trimmedName, trimmedRole);
+
+    // 既存の回答者が気持ちを変えて回答し直すのは締め切り後も許可するが、新規の回答は締め切り後に受け付けない
+    if (!existingReply && getClosedState(invitation).closed) {
+        return res.status(400).json({ error: "この招待状の回答受付は終了しています" });
+    }
+
     if (existingReply) {
-        statements.updateReply.run(attending, trimmedComment, existingReply.id);
+        statements.updateReply.run(attending, trimmedComment, companionCount, existingReply.id);
     } else {
         statements.insertReply.run(
             crypto.randomUUID(),
@@ -297,6 +368,7 @@ app.post("/invitations/:id/replies", (req, res) => {
             attending,
             trimmedComment,
             trimmedRole,
+            companionCount,
         );
     }
 
@@ -331,6 +403,11 @@ app.post("/invitations/:id/schedule-votes", (req, res) => {
     const selectionJson = JSON.stringify(cleanedSelection);
 
     const existingVote = statements.getScheduleVoteByNameAndRole.get(invitation.id, trimmedName, trimmedRole);
+
+    if (!existingVote && getClosedState(invitation).closed) {
+        return res.status(400).json({ error: "この招待状の回答受付は終了しています" });
+    }
+
     if (existingVote) {
         statements.updateScheduleVote.run(selectionJson, trimmedComment, existingVote.id);
     } else {
@@ -358,16 +435,26 @@ app.get("/invitations/:id/replies", (req, res) => {
     }
 
     const replies = statements.getRepliesByInvitationId.all(invitation.id);
-    const counts = { yes: 0, no: 0 };
+    const counts = { yes: 0, no: 0, totalAttendees: 0 };
     replies.forEach((reply) => {
-        if (reply.attending === "yes") counts.yes += 1;
-        else if (reply.attending === "no") counts.no += 1;
+        if (reply.attending === "yes") {
+            counts.yes += 1;
+            counts.totalAttendees += 1 + (reply.companion_count || 0);
+        } else if (reply.attending === "no") {
+            counts.no += 1;
+        }
     });
+
+    const closedState = getClosedState(invitation);
 
     res.json({
         title: invitation.title,
         template_id: invitation.template_id || "standard",
         response_type: invitation.response_type || "rsvp",
+        response_deadline: invitation.response_deadline,
+        capacity: invitation.capacity,
+        closed: closedState.closed,
+        closed_reason: closedState.reason,
         counts,
         replies,
     });
@@ -397,9 +484,14 @@ app.get("/invitations/:id/schedule-votes", (req, res) => {
         });
     });
 
+    const closedState = getClosedState(invitation);
+
     res.json({
         title: invitation.title,
         template_id: invitation.template_id || "standard",
+        response_deadline: invitation.response_deadline,
+        closed: closedState.closed,
+        closed_reason: closedState.reason,
         options,
         counts,
         votes,

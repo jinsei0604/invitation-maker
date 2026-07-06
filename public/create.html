@@ -70,6 +70,16 @@
                 <button type="button" class="link-btn" id="addScheduleOptionBtn">＋ 候補日を追加</button>
             </div>
 
+            <label class="field">
+                <span class="field__label">回答期限（任意）</span>
+                <input type="datetime-local" id="deadlineInput" name="response_deadline">
+            </label>
+
+            <label class="field" id="capacityField">
+                <span class="field__label">定員（任意）</span>
+                <input type="number" id="capacityInput" name="capacity" min="1" step="1" placeholder="例：50">
+            </label>
+
             <p class="error-text" id="formError" hidden></p>
 
             <button type="submit" class="btn-primary">プレビューする</button>
@@ -197,6 +207,12 @@
             </div>
             <p class="copied-note" id="copiedShareNote" hidden>コピーしました</p>
             <a class="link-btn" id="viewInviteLink" href="#" target="_blank" rel="noopener">実際の招待状を見てみる</a>
+
+            <div class="qr-block">
+                <p class="qr-block__desc">紙の招待状や当日の受付など、オンラインで完結しない場面ではQRコードもお使いください。</p>
+                <img class="qr-block__img" id="shareQrImg" alt="招待状URLのQRコード">
+                <a class="link-btn" id="downloadQrLink" download="invitation-qr.png">QRコードをダウンロード</a>
+            </div>
         </div>
 
         <div class="url-block url-block--manage">

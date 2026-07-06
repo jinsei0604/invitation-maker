@@ -106,11 +106,31 @@ function reveal(invitation) {
     showResponseSection(invitation);
 }
 
-// invitationのresponse_typeに応じて、出欠フォーム／日程調整フォームのどちらかを表示する
+const CLOSED_REASON_LABELS = {
+    deadline: "回答期限を過ぎたため、受付を終了しました。",
+    capacity: "定員に達したため、受付を終了しました。",
+};
+
+// invitationのresponse_typeに応じて、出欠フォーム／日程調整フォームのどちらかを表示する。
+// 回答期限・定員により受付が締め切られている場合は、フォームの代わりに終了メッセージを出す。
 function showResponseSection(invitation) {
     const isSchedule = invitation.response_type === "schedule";
-    document.getElementById("rsvpSection").hidden = isSchedule;
-    document.getElementById("scheduleSection").hidden = !isSchedule;
+    const rsvpSection = document.getElementById("rsvpSection");
+    const scheduleSection = document.getElementById("scheduleSection");
+    const closedSection = document.getElementById("responseClosedSection");
+
+    if (invitation.closed) {
+        rsvpSection.hidden = true;
+        scheduleSection.hidden = true;
+        closedSection.hidden = false;
+        document.getElementById("responseClosedReason").textContent =
+            CLOSED_REASON_LABELS[invitation.closed_reason] || "受付を終了しました。";
+        return;
+    }
+
+    closedSection.hidden = true;
+    rsvpSection.hidden = isSchedule;
+    scheduleSection.hidden = !isSchedule;
 
     if (isSchedule) {
         renderScheduleOptions(invitation.schedule_options || []);
@@ -132,6 +152,8 @@ const rsvpNameInput = document.getElementById("rsvpName");
 const rsvpRoleInput = document.getElementById("rsvpRole");
 const rsvpCommentInput = document.getElementById("rsvpComment");
 const rsvpAttendPicker = document.getElementById("rsvpAttendPicker");
+const rsvpCompanionField = document.getElementById("rsvpCompanionField");
+const rsvpCompanionCountInput = document.getElementById("rsvpCompanionCount");
 const rsvpAnotherBtn = document.getElementById("rsvpAnotherBtn");
 const rsvpError = document.getElementById("rsvpError");
 
@@ -152,6 +174,7 @@ function resetRsvpForm() {
     rsvpAttendPicker.querySelectorAll(".rsvp-attend-btn").forEach((el) => {
         el.classList.remove("is-selected");
     });
+    rsvpCompanionField.hidden = true;
     rsvpError.hidden = true;
 }
 
@@ -172,6 +195,8 @@ rsvpAttendPicker.addEventListener("click", (e) => {
     rsvpAttendPicker.querySelectorAll(".rsvp-attend-btn").forEach((el) => {
         el.classList.toggle("is-selected", el === btn);
     });
+    rsvpCompanionField.hidden = selectedAttend !== "yes";
+    if (rsvpCompanionField.hidden) rsvpCompanionCountInput.value = "0";
 });
 
 rsvpForm.addEventListener("submit", async (e) => {
@@ -202,6 +227,7 @@ rsvpForm.addEventListener("submit", async (e) => {
                 attending: selectedAttend,
                 comment: rsvpCommentInput.value.trim(),
                 role_grade: rsvpRoleInput.value.trim(),
+                companion_count: rsvpCompanionCountInput.value,
             }),
         });
         const data = await res.json().catch(() => ({}));

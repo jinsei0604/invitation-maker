@@ -77,6 +77,9 @@ document.getElementById("backToTemplateBtn").addEventListener("click", () => {
 const responseTypePicker = document.getElementById("responseTypePicker");
 const scheduleOptionsField = document.getElementById("scheduleOptionsField");
 const scheduleOptionsList = document.getElementById("scheduleOptionsList");
+const capacityField = document.getElementById("capacityField");
+const deadlineInput = document.getElementById("deadlineInput");
+const capacityInput = document.getElementById("capacityInput");
 let selectedResponseType = "rsvp";
 
 function addScheduleOptionRow() {
@@ -110,6 +113,9 @@ responseTypePicker.addEventListener("click", (e) => {
         el.classList.toggle("is-selected", el === btn);
     });
     scheduleOptionsField.hidden = selectedResponseType !== "schedule";
+    // 定員は座席数の概念がある出欠フォームのみ意味を持つため、日程調整では隠す
+    capacityField.hidden = selectedResponseType === "schedule";
+    if (capacityField.hidden) capacityInput.value = "";
 });
 
 function currentScheduleOptions() {
@@ -130,6 +136,8 @@ function currentFormData() {
         template_id: selectedTemplateId,
         response_type: selectedResponseType,
         schedule_options: selectedResponseType === "schedule" ? currentScheduleOptions() : [],
+        response_deadline: deadlineInput.value ? new Date(deadlineInput.value).toISOString() : "",
+        capacity: selectedResponseType === "rsvp" ? capacityInput.value.trim() : "",
     };
 }
 
@@ -268,6 +276,8 @@ const goCheckoutBtn = document.getElementById("goCheckoutBtn");
 const shareUrlInput = document.getElementById("shareUrlInput");
 const manageUrlInput = document.getElementById("manageUrlInput");
 const viewInviteLink = document.getElementById("viewInviteLink");
+const shareQrImg = document.getElementById("shareQrImg");
+const downloadQrLink = document.getElementById("downloadQrLink");
 
 async function createInvitation(data) {
     const res = await fetch("/invitations", {
@@ -287,10 +297,12 @@ goCheckoutBtn.addEventListener("click", async () => {
     goCheckoutBtn.disabled = true;
     showStep("processing");
     try {
-        const { shareUrl, manageUrl } = await createInvitation(currentFormData());
+        const { shareUrl, manageUrl, qrDataUrl } = await createInvitation(currentFormData());
         shareUrlInput.value = shareUrl;
         manageUrlInput.value = manageUrl;
         viewInviteLink.href = shareUrl;
+        shareQrImg.src = qrDataUrl;
+        downloadQrLink.href = qrDataUrl;
         showStep("complete");
     } catch (err) {
         showStep("preview");
