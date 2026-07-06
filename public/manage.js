@@ -131,7 +131,7 @@ function renderReplies(replies) {
 
 function buildRsvpExcelText(replies) {
     const sanitize = (value) => String(value || "").replace(/\t/g, " ").replace(/\r?\n/g, " ");
-    const header = ["お名前", "役職・学年", "出欠", "同伴者人数", "コメント", "回答日時"];
+    const header = ["お名前", "役職または学年", "出欠", "同伴者人数", "コメント", "回答日時"];
     const rows = replies.map((reply) => [
         sanitize(reply.guest_name),
         sanitize(reply.role_grade),
@@ -259,7 +259,7 @@ function buildScheduleExcelText(votes, options) {
     const labelById = {};
     options.forEach((option) => { labelById[option.id] = option.option_label; });
 
-    const header = ["お名前", "役職・学年", "参加できる候補日", "コメント", "回答日時"];
+    const header = ["お名前", "役職または学年", "参加できる候補日", "コメント", "回答日時"];
     const rows = votes.map((vote) => [
         sanitize(vote.guest_name),
         sanitize(vote.role_grade),

@@ -142,7 +142,7 @@ function showResponseSection(invitation) {
 
 // --- 出欠フォーム（同じページ内で完結させる。別ページには遷移しない） ---
 // ひとつのURLを複数人で使うことがあるため、送信後もフォームに戻って何度でも
-// 送信できるようにしている。同じ名前（＋役職・学年）で再送信した場合はサーバー側で上書きされる。
+// 送信できるようにしている。同じ名前（＋役職または学年）で再送信した場合はサーバー側で上書きされる。
 
 const rsvpFormWrap = document.getElementById("rsvpFormWrap");
 const rsvpDone = document.getElementById("rsvpDone");
