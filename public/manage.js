@@ -45,6 +45,30 @@ function metaLine(reply) {
     return parts.length ? `<p class="rsvp-reply-card__meta">${parts.join(" / ")}</p>` : "";
 }
 
+function guestDisplayName(reply) {
+    const parts = [reply.guest_name];
+    if (reply.role_grade) parts.push(`（${reply.role_grade}）`);
+    return parts.join("");
+}
+
+// --- 人数クリックで一覧を出す一覧モーダル ---
+
+function openListModal(title, replies) {
+    document.getElementById("listModalTitle").textContent = `${title}（${replies.length}人）`;
+    const body = document.getElementById("listModalBody");
+    body.innerHTML = replies.length
+        ? `<ol class="list-modal__names">${replies.map((r) => `<li>${escapeHtml(guestDisplayName(r))}</li>`).join("")}</ol>`
+        : `<p class="sub">該当する回答はありません。</p>`;
+    document.getElementById("listModal").hidden = false;
+}
+
+function closeListModal() {
+    document.getElementById("listModal").hidden = true;
+}
+
+document.getElementById("listModalBackdrop").addEventListener("click", closeListModal);
+document.getElementById("listModalClose").addEventListener("click", closeListModal);
+
 // --- 出欠フォーム（response_type = 'rsvp'）の表示 ---
 
 let currentReplies = [];
@@ -117,6 +141,14 @@ document.getElementById("copyExcelBtn").addEventListener("click", () => {
     copyToClipboard(buildRsvpExcelText(currentReplies), "copiedExcelNote");
 });
 
+document.getElementById("rsvpYesBox").addEventListener("click", () => {
+    openListModal("出席", currentReplies.filter((r) => r.attending === "yes"));
+});
+
+document.getElementById("rsvpNoBox").addEventListener("click", () => {
+    openListModal("欠席", currentReplies.filter((r) => r.attending === "no"));
+});
+
 async function loadRsvpView() {
     const res = await fetch(`/invitations/${encodeURIComponent(id)}/replies?token=${encodeURIComponent(token)}`);
     const data = await res.json().catch(() => ({}));
@@ -140,7 +172,7 @@ function renderScheduleTally(options, counts, totalVoters) {
         const count = counts[option.id] || 0;
         const percent = totalVoters > 0 ? Math.round((count / totalVoters) * 100) : 0;
         return `
-            <div class="schedule-tally__row">
+            <button type="button" class="schedule-tally__row" data-option-id="${escapeHtml(String(option.id))}">
                 <div class="schedule-tally__row-head">
                     <span class="schedule-tally__label">${escapeHtml(option.option_label)}</span>
                     <span class="schedule-tally__count">${count}人</span>
@@ -148,10 +180,19 @@ function renderScheduleTally(options, counts, totalVoters) {
                 <div class="schedule-tally__bar-track">
                     <div class="schedule-tally__bar-fill" style="width: ${percent}%"></div>
                 </div>
-            </div>
+            </button>
         `;
     }).join("");
 }
+
+document.getElementById("scheduleTally").addEventListener("click", (event) => {
+    const row = event.target.closest(".schedule-tally__row");
+    if (!row) return;
+    const optionId = row.dataset.optionId;
+    const option = currentOptions.find((o) => String(o.id) === optionId);
+    const matches = currentVotes.filter((vote) => vote.selected_option_ids.some((id) => String(id) === optionId));
+    openListModal(option ? option.option_label : "候補日", matches);
+});
 
 function renderScheduleVotes(votes, options) {
     const listEl = document.getElementById("scheduleVoteList");

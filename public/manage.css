@@ -31,6 +31,21 @@
     border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--surface);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.rsvp-summary__item:hover,
+.rsvp-summary__item:focus-visible {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.summary-hint {
+    margin: -14px 0 20px;
+    font-size: 12px;
+    color: var(--text-muted);
 }
 
 .rsvp-summary__count {
@@ -148,10 +163,22 @@
 }
 
 .schedule-tally__row {
+    display: block;
+    width: 100%;
     padding: 14px 16px;
     border-radius: 10px;
     border: 1px solid var(--border);
     background: var(--surface);
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.schedule-tally__row:hover,
+.schedule-tally__row:focus-visible {
+    border-color: var(--accent);
+    background: var(--accent-soft);
 }
 
 .schedule-tally__row-head {
@@ -194,4 +221,97 @@
     color: var(--text);
     line-height: 1.6;
     margin: 0 0 6px;
+}
+
+/* --- 一覧モーダル --- */
+
+.list-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.list-modal[hidden] {
+    display: none;
+}
+
+.list-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 16, 14, 0.45);
+}
+
+.list-modal__panel {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    max-height: 78vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg, #fff);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.18);
+    padding: 20px 22px;
+}
+
+@media (min-width: 680px) {
+    .list-modal {
+        align-items: center;
+    }
+
+    .list-modal__panel {
+        border-radius: 16px;
+        max-height: 70vh;
+    }
+}
+
+.list-modal__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.list-modal__head h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+}
+
+.list-modal__close {
+    border: none;
+    background: none;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.list-modal__close:hover {
+    color: var(--text);
+}
+
+.list-modal__body {
+    overflow-y: auto;
+}
+
+.list-modal__names {
+    margin: 0;
+    padding-left: 1.4em;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.list-modal__names li {
+    font-size: 14.5px;
+    color: var(--text);
+    line-height: 1.5;
 }
